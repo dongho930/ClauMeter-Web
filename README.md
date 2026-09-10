@@ -14,7 +14,28 @@ npm run preview  # serve the built output
 ```
 
 `dist/` is fully static and uses relative asset paths, so it can be dropped on
-GitHub Pages, Netlify, Vercel or any static host as-is.
+any static host as-is.
+
+## Deploying (Cloudflare Pages)
+
+Create a Pages project pointed at this repository and give it:
+
+| Setting | Value |
+|---|---|
+| Framework preset | None |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Node version | taken from `.node-version` (20) |
+
+`public/_headers` ships the caching and security headers — Vite fingerprints
+everything under `/assets`, so those are cached forever and the HTML is not.
+
+**Set the real address before launch.** Link-preview crawlers (KakaoTalk, Slack,
+X, Facebook) will not follow a relative `og:image`, so `index.html` uses absolute
+URLs built from `VITE_SITE_URL` in [`.env`](.env). It is checked in on purpose —
+it holds the public address and nothing secret — so change that one line to the
+real domain and rebuild. `public/robots.txt` names the same host and needs the
+same edit. Anything genuinely private belongs in `.env.local`, which is ignored.
 
 ## Before it goes live
 
