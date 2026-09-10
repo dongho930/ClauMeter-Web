@@ -1,0 +1,16 @@
+# Vite fingerprints everything under /assets, so it can be cached forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Screenshots and the icon change only when they are re-captured.
+/shots/*
+  Cache-Control: public, max-age=604800
+/icon.png
+  Cache-Control: public, max-age=604800
+/og.png
+  Cache-Control: public, max-age=604800
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN

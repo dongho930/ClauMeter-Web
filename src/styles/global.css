@@ -1,0 +1,100 @@
+@import './tokens.css';
+@import './ui.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: auto; }
+
+body {
+  margin: 0;
+  background: var(--ink-1);
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: 0.005em;
+  margin: 0;
+}
+
+p { margin: 0; max-width: var(--measure); }
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 3px;
+}
+
+/* ---- the fixed 3D stage sits behind everything ---- */
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+.stage canvas { display: block; }
+
+.scroller {
+  position: relative;
+  z-index: 1;
+  padding-left: var(--rail);
+}
+
+/* ---- panel plate: an engraved instrument face, square-cut ---- */
+.plate {
+  background: linear-gradient(176deg, rgba(26,45,56,0.82), rgba(11,20,24,0.88));
+  border: 1px solid rgba(70,96,110,0.5);
+  border-radius: 2px;
+  backdrop-filter: blur(14px);
+}
+
+/* ---- graduated hairline used as a section divider ---- */
+.grad-rule {
+  height: 9px;
+  border-top: 1px solid var(--steel);
+  background-image: repeating-linear-gradient(to right, var(--steel) 0 1px, transparent 1px 22px);
+  background-repeat: repeat-x;
+  background-size: 22px 5px;
+  background-position: top left;
+  opacity: 0.55;
+}
+
+/* ---- machine values ---- */
+.val {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-sm);
+  letter-spacing: -0.02em;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+section {
+  position: relative;
+  padding: 13vh var(--gutter) 13vh clamp(26px, 3.4vw, 62px);
+  max-width: 1220px;
+}
+
+.lede {
+  font-size: var(--t-lg);
+  color: var(--paper-dim);
+  line-height: 1.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

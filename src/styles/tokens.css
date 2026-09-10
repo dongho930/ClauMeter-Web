@@ -1,0 +1,50 @@
+:root {
+  /* Ground: blue-graphite, the colour of an instrument housing — not neutral black. */
+  --ink-0: #060c10;
+  --ink-1: #0b1418;
+  --ink-2: #112029;
+  --ink-3: #1a2d38;
+
+  /* Brushed nickel. Every hairline and graduation on the page is one of these. */
+  --steel: #46606e;
+  --steel-lit: #93a8b3;
+
+  --paper: #e6edf1;
+  --paper-dim: #a9bcc6;
+
+  /* The printed datasheet. Cool stock, not warm cream. */
+  --sheet: #d9e2e6;
+  --sheet-2: #c7d3d8;
+  --sheet-ink: #0d181f;
+  --sheet-dim: #4b5f6a;
+
+  /* Semantic only. These are the widget's own thresholds; nothing else is coloured. */
+  --ok: #3fd08a;
+  --caution: #f0b429;
+  --redline: #f0533f;
+
+  --font-display: 'Instrument Serif', 'Nanum Myeongjo', 'Apple SD Gothic Neo', Georgia, serif;
+  --font-body: 'Manrope', 'Gothic A1', 'Malgun Gothic', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+
+  /* Perfect-fourth scale off a 17px body. */
+  --t-xs: 0.75rem;
+  --t-sm: 0.875rem;
+  --t-base: 1.0625rem;
+  --t-lg: 1.3125rem;
+  --t-xl: 1.75rem;
+  --t-2xl: 2.375rem;
+  --t-3xl: 3.25rem;
+
+  --rail: 72px;
+  --gutter: 28px;
+  --measure: 34rem;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --rail: 44px;
+    --gutter: 18px;
+    --t-base: 1rem;
+  }
+}
