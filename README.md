@@ -16,9 +16,18 @@ npm run preview  # serve the built output
 `dist/` is fully static and uses relative asset paths, so it can be dropped on
 any static host as-is.
 
-## Deploying (Cloudflare Pages)
+## Deploying (Cloudflare)
 
-Create a Pages project pointed at this repository and give it:
+Live at **https://claumeter-web.skysky930.workers.dev**
+
+Cloudflare's build step turns a Vite project into a Workers application rather
+than a Pages one, and a fresh Worker starts with no address attached — the
+dashboard shows "No URLs enabled" until `workers.dev` is switched on under
+Settings → Domains & Routes. Workers Static Assets honours `public/_headers`
+just as Pages does; the deployed site was checked and both the long-lived
+`/assets/*` cache and the security headers are being applied.
+
+The build settings are:
 
 | Setting | Value |
 |---|---|
@@ -36,12 +45,14 @@ and output directory above is enough.
 `public/_headers` ships the caching and security headers — Vite fingerprints
 everything under `/assets`, so those are cached forever and the HTML is not.
 
-**Set the real address before launch.** Link-preview crawlers (KakaoTalk, Slack,
-X, Facebook) will not follow a relative `og:image`, so `index.html` uses absolute
-URLs built from `VITE_SITE_URL` in [`.env`](.env). It is checked in on purpose —
-it holds the public address and nothing secret — so change that one line to the
-real domain and rebuild. `public/robots.txt` names the same host and needs the
-same edit. Anything genuinely private belongs in `.env.local`, which is ignored.
+**If the address changes**, three files name it: `VITE_SITE_URL` in [`.env`](.env),
+the sitemap line in `public/robots.txt`, and the `<loc>` in `public/sitemap.xml`.
+`.env` is checked in on purpose — it holds the public address and nothing secret;
+anything genuinely private belongs in `.env.local`, which is ignored.
+
+The absolute URLs matter: link-preview crawlers (KakaoTalk, Slack, X, Facebook)
+will not follow a relative `og:image`, so `index.html` builds `og:image`, `og:url`
+and `canonical` from `VITE_SITE_URL` at build time.
 
 ## Before it goes live
 

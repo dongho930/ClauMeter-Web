@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://claumeter.pages.dev/sitemap.xml
+Sitemap: https://claumeter-web.skysky930.workers.dev/sitemap.xml
