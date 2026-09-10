@@ -25,7 +25,13 @@ Create a Pages project pointed at this repository and give it:
 | Framework preset | None |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
-| Node version | taken from `.node-version` (20) |
+| Node version | taken from `.node-version` (22) |
+
+Cloudflare inspects the project and refuses to configure a Vite older than 6, so
+the toolchain is pinned to Vite 7 (which wants Node 20.19+, hence `.node-version`
+22). Nothing here needs Cloudflare's framework integration — if its auto-detection
+ever gets in the way, setting the preset to **None** and keeping the build command
+and output directory above is enough.
 
 `public/_headers` ships the caching and security headers — Vite fingerprints
 everything under `/assets`, so those are cached forever and the HTML is not.
