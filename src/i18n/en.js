@@ -4,30 +4,30 @@ export default {
 
   hero: {
     title: ['See the limit', 'coming.'],
-    lede: "A Windows widget that keeps your 5-hour and weekly Claude Code usage on screen while you work. The numbers come from Anthropic's own servers — the same ones your limit is enforced on.",
+    lede: "A Windows widget that pins your 5-hour and weekly Claude Code usage to the screen while you work. The numbers come straight from Anthropic — the same ones that decide when you get cut off.",
     download: 'Download for Windows',
-    repo: 'View on GitHub',
-    meta: 'Free and MIT licensed, for Windows 10 and 11.',
+    repo: 'View source on GitHub',
+    meta: 'Free & open source (MIT) · Windows 10 and 11 · No API key',
     gauge5h: '5-hour window',
     gaugeWeek: 'Weekly window',
     resets: 'resets in',
   },
 
   problem: {
-    title: ['The limit arrives', 'without warning.'],
-    lede: 'Claude Code gives you no countdown. It works, and then it does not, and the first you hear of it is the message that will not send.',
+    title: ['No warning.', 'It just stops.'],
+    lede: "Claude Code doesn't count down. It works right up until it doesn't — and you find out when your message won't send.",
     points: [
       {
-        head: 'The status line is there, and you miss it',
-        body: 'Claude Code prints your usage into the terminal status line. It scrolls away, it sits behind another window, and it is never where your eyes are.',
+        head: 'The status line is easy to miss',
+        body: "Claude Code does print usage in the terminal status line. But it scrolls away, hides behind other windows, and is never where you're looking.",
       },
       {
-        head: 'A percentage on its own tells you little',
-        body: 'Eighty percent means one thing with four hours left in the window and something else entirely with twenty minutes left. The reset time is the half that decides what to do next.',
+        head: "A percentage alone isn't enough",
+        body: '80% with four hours left in the window means slow down. 80% with twenty minutes left means keep going. The reset time is what tells you which.',
       },
       {
-        head: 'ClauMeter sits where you are already looking',
-        body: 'It floats above the editor with both windows and both countdowns, reads the percentage Anthropic already calculated, and shows it unchanged. When there is no reading yet, it says so.',
+        head: "ClauMeter sits where you're already looking",
+        body: "It floats above your editor with both windows and both countdowns. It shows the percentage Anthropic already calculated, untouched — and if there's no reading yet, it tells you.",
       },
     ],
     traceLabel: 'This session',
@@ -37,50 +37,50 @@ export default {
   },
 
   features: {
-    title: ['Six things', 'it does.'],
+    title: ['Small widget.', 'Six jobs.'],
     items: [
-      { head: 'Live gauges', body: 'The 5-hour and weekly rates redraw every second, with the reset countdown under each. Green while you have room, amber past 75%, red past 90%.' },
-      { head: 'Pace advice', body: 'A prediction model trained on your own past windows works out where this one is heading, and an AI turns that into a sentence you can act on. It also shows how far off it has been lately, so you can decide how much to trust it.' },
-      { head: 'Threshold alerts', body: 'A Windows toast at 50%, 75% and 90%. Once per window, and it remembers across restarts, so the same alert never fires twice.' },
-      { head: 'Twelve languages', body: 'The whole widget, and the AI advice with it, switches the moment you pick a language. It stays picked.' },
-      { head: 'Out of the way', body: 'Click-through mode lets the mouse pass straight through. Adjustable opacity, always on top, hidden from the taskbar, dragged anywhere.' },
-      { head: 'Nothing to configure', body: 'The statusLine hook registers itself. Open a Claude Code terminal once and readings start. No API key, ever.' },
+      { head: 'Live gauges', body: "Your 5-hour and weekly usage, redrawn every second, each with its own reset countdown. Green while there's room, amber past 75%, red past 90%." },
+      { head: 'Pace advice', body: "A prediction model trained on your own past windows forecasts where this one is headed, and AI turns that into one sentence you can act on. It also shows how far off it's been lately, so you decide how much to trust it." },
+      { head: 'Threshold alerts', body: 'Windows notifications at 50%, 75%, and 90%. Once per window — and it remembers through restarts, so you never get the same alert twice.' },
+      { head: 'Twelve languages', body: 'Pick a language and the whole widget switches instantly, AI advice included. Your choice sticks.' },
+      { head: 'Stays out of your way', body: 'Turn on click-through and your mouse passes right through it. Adjustable opacity, always on top, no taskbar clutter, drag it anywhere.' },
+      { head: 'Zero setup', body: 'The statusLine hook sets itself up. Open Claude Code once and the numbers start flowing. No API key, ever.' },
     ],
   },
 
   steps: {
-    title: ['From installer', 'to first reading.'],
+    title: ['From download', 'to live numbers.'],
     items: [
-      { head: 'Run the installer', body: 'Download {installer} and run it. The usual Windows wizard, nothing to choose.' },
-      { head: 'The widget appears', body: 'It docks near the bottom of your screen reading "No data". That is correct — it has nothing to read yet.' },
-      { head: 'Open Claude Code once', body: 'Send a single message. The statusLine hook is already registered, so the first real percentage lands immediately.' },
-      { head: 'Tune it, or do not', body: 'The gear icon holds opacity, language and alerts. Every default is a working default.' },
+      { head: 'Run the installer', body: 'Download {installer} and run it. A standard Windows installer with nothing to decide.' },
+      { head: 'The widget appears', body: 'It docks near the bottom of your screen showing "No data". That\'s expected — there\'s just nothing to read yet.' },
+      { head: 'Open Claude Code once', body: 'Send one message. The statusLine hook is already in place, so your first real numbers show up right away.' },
+      { head: "Tweak it, or don't", body: 'Opacity, language, and alerts live behind the gear icon. The defaults work fine as they are.' },
     ],
   },
 
   languages: {
-    title: ['It speaks', 'twelve languages.'],
-    lede: 'Pick one in the settings window and the widget, the settings, the detail panel and the AI advice all follow. Click a name to try it here.',
+    title: ['It speaks', 'your language.'],
+    lede: 'Choose from twelve languages in settings, and the widget, settings, details panel, and AI advice all switch together. Pick a name below to preview it.',
     tryLabel: 'Widget preview',
   },
 
   gallery: {
     title: ['What you', 'actually get.'],
-    lede: 'Three windows, and that is the whole program. Sample readings, real interface.',
+    lede: "Three windows. That's the whole app. Sample numbers, real screens.",
     items: [
       {
         head: 'The widget',
-        body: 'Two bars, two reset countdowns, and the time of the last reading. 340 by 160 pixels, dragged wherever it stays out of your way.',
+        body: "Two bars, two reset countdowns, and when it last updated. 340 × 160 px — drag it wherever it won't get in your way.",
         alt: 'The ClauMeter widget showing the 5-hour window at 62% and the week at 34%, each with a reset countdown',
       },
       {
         head: 'Pace advice',
-        body: 'The numbers come from the prediction model, the sentences from the AI. It also shows how far off the model has been lately, so you can decide how much to trust it.',
+        body: 'Numbers from the prediction model, words from AI — plus its recent track record, so you know how much weight to give it.',
         alt: 'The details window with projected end-of-window usage, a caution badge, and written advice for the 5-hour and weekly limits',
       },
       {
         head: 'Settings',
-        body: 'Language, transparency, alerts. That is every setting there is.',
+        body: "Language, transparency, alerts. That's the entire list.",
         alt: 'The settings window with a language dropdown, a transparency slider, and a usage-notifications checkbox',
       },
     ],
@@ -91,29 +91,29 @@ export default {
     reqTitle: 'System requirements',
     reqs: [
       ['Operating system', 'Windows 10 or Windows 11'],
-      ['Prerequisite', 'Claude Code CLI, installed and in use (includes Node.js)'],
+      ['Requires', 'Claude Code CLI, installed and in use (includes Node.js)'],
       ['API key', 'Not required'],
       ['Price', 'Free'],
       ['License', 'MIT'],
       ['Version', '{version}'],
       ['Installer SHA-256', '{sha256}'],
     ],
-    faqTitle: 'Questions worth asking',
+    faqTitle: 'Before you download',
     faqs: [
-      { q: 'Does it cost anything?', a: 'No. ClauMeter is free.' },
-      { q: 'Do I have to enter an API key?', a: 'No. The Groq key used for advice lives on the proxy server. It is not in the app you download, and there is nothing for you to paste in.' },
-      { q: 'Is my usage data sent anywhere?', a: 'The percentages are computed locally and stay on your machine. Only when you ask for pace advice do the already-computed statistics — numbers, never any part of a conversation — go to the proxy so the advice can be written.' },
-      { q: 'Is it open source?', a: 'Yes, MIT licensed. The repository is linked in the footer.' },
+      { q: 'Is it really free?', a: 'Yes. Free to download, free to use, and open source.' },
+      { q: 'Do I need an API key?', a: "No. The Groq key that powers the advice lives on a proxy server. It isn't bundled in the app, and there's nothing for you to paste in." },
+      { q: 'Does my usage data leave my computer?', a: 'Your percentages are calculated locally and stay there. Only when you ask for pace advice are the already-computed statistics sent to the proxy to write it — just numbers, never a word of your conversations.' },
+      { q: 'Is it open source?', a: 'Yes, under the MIT license. The repository is linked in the footer.' },
       {
-        q: 'Windows says the publisher is unknown. Should I worry?',
-        a: 'ClauMeter is not code-signed, so SmartScreen shows its blue "Windows protected your PC" notice. Choose More info, then Run anyway. A signing certificate costs money every year, which is a lot to carry for a free tool — so the SHA-256 of the installer is published above and on the release instead. Check it before you run the file: in PowerShell, Get-FileHash on the downloaded .exe should print exactly that string.',
+        q: 'Windows warns about an unknown publisher. Is that a problem?',
+        a: 'ClauMeter isn\'t code-signed, so SmartScreen shows a blue "Windows protected your PC" screen. Click More info, then Run anyway. Signing certificates cost money every year, which is hard to justify for a free tool — so the installer\'s SHA-256 is published above and on the release page instead. To verify before you run it, use Get-FileHash on the downloaded .exe in PowerShell. The output should match exactly.',
       },
     ],
   },
 
   cta: {
-    title: 'Know where you stand, all day.',
-    lede: 'One installer. No account, no key, no configuration.',
+    title: 'Never hit the limit blind again.',
+    lede: 'One installer. No account, no API key, nothing to configure.',
   },
 
   footer: {

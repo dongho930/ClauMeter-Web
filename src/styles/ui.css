@@ -178,7 +178,7 @@
   font-weight: 400;
   margin-bottom: 28px;
 }
-.lede { margin-bottom: 30px; }
+.lede { margin-bottom: 30px; text-wrap: pretty; }
 .meta { color: var(--steel-lit); margin-top: 26px; font-size: 0.75rem; }
 
 .cta-row {
@@ -384,7 +384,7 @@
    Closing
    ============================================================ */
 .closing { padding-bottom: 6vh; }
-.closing-title { font-size: clamp(2.4rem, 5.6vw, 4.4rem); max-width: 18ch; }
+.closing-title { font-size: clamp(2.4rem, 5.6vw, 4.4rem); max-width: 18ch; text-wrap: balance; }
 .foot { margin-top: 16vh; }
 .foot-row {
   display: flex;
