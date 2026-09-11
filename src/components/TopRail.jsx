@@ -1,5 +1,4 @@
 import { useI18n } from '../i18n/index.jsx'
-import { LINKS } from '../config.js'
 
 export function TopRail() {
   const { t, lang, toggle } = useI18n()
@@ -23,7 +22,7 @@ export function TopRail() {
           <span className="lang-sep" aria-hidden="true" />
           <span className={lang === 'ko' ? 'on' : ''}>KO</span>
         </button>
-        <a className="btn btn-sm" href={LINKS.download}>{t.nav.download}</a>
+        <a className="btn btn-sm" href="#download">{t.nav.download}</a>
       </div>
     </header>
   )

@@ -1,6 +1,6 @@
 # ClauMeter — download site
 
-A 3D interactive landing page for ClauMeter, the Windows desktop widget that shows
+A 3D interactive landing page for ClauMeter, the desktop widget that shows
 your real Claude Code 5-hour and weekly usage. Built from the Notion content plan
 *"ClauMeter 다운로드 웹사이트 콘텐츠 기획"*.
 
@@ -60,16 +60,16 @@ Every outbound link lives in one file, [`src/config.js`](src/config.js), and the
 all point at `github.com/dongho930/ClauMeter` (verified public, default branch
 `main`, issues enabled).
 
-v1.0.0 is published and the download button points straight at its asset. All
-four links were checked and return 200.
+v1.1.0 is published, and the Windows and Mac download buttons point straight at
+its two assets (`ClauMeter.Setup.1.1.0.exe` and `ClauMeter-1.1.0-universal.dmg`).
 
 Note that GitHub rewrites spaces in an asset name as dots, so the file people
-actually receive is `ClauMeter.Setup.1.0.0.exe`, not the `ClauMeter Setup 1.0.0.exe`
+actually receive is `ClauMeter.Setup.1.1.0.exe`, not the `ClauMeter Setup 1.1.0.exe`
 electron-builder writes locally — the page quotes the name they will really see.
-The download URL is pinned to this version on purpose (the asset name carries the
+The download URLs are pinned to this version on purpose (the asset names carry the
 version, so `/releases/latest/download/...` would break on the next release).
-**To ship a new version, bump `VERSION` in `src/config.js`; the installer name and
-the download URL both follow from it.**
+**To ship a new version, bump `VERSION` in `src/config.js`; both installer names and
+both download URLs follow from it.**
 
 ## The idea
 

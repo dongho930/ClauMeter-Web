@@ -4,10 +4,10 @@ export default {
 
   hero: {
     title: ['See the limit', 'coming.'],
-    lede: "A Windows widget that pins your 5-hour and weekly Claude Code usage to the screen while you work. The numbers come straight from Anthropic — the same ones that decide when you get cut off.",
+    lede: "A desktop widget that pins your 5-hour and weekly Claude Code usage to the screen while you work. The numbers come straight from Anthropic — the same ones that decide when you get cut off.",
     download: 'Download for Windows',
-    repo: 'View source on GitHub',
-    meta: 'Free & open source (MIT) · Windows 10 and 11 · No API key',
+    downloadMac: 'Download for Mac',
+    meta: 'Free & open source (MIT) · No API key',
     gauge5h: '5-hour window',
     gaugeWeek: 'Weekly window',
     resets: 'resets in',
@@ -41,7 +41,7 @@ export default {
     items: [
       { head: 'Live gauges', body: "Your 5-hour and weekly usage, redrawn every second, each with its own reset countdown. Green while there's room, amber past 75%, red past 90%." },
       { head: 'Pace advice', body: "A prediction model trained on your own past windows forecasts where this one is headed, and AI turns that into one sentence you can act on. It also shows how far off it's been lately, so you decide how much to trust it." },
-      { head: 'Threshold alerts', body: 'Windows notifications at 50%, 75%, and 90%. Once per window — and it remembers through restarts, so you never get the same alert twice.' },
+      { head: 'Threshold alerts', body: 'Desktop notifications at 50%, 75%, and 90%. Once per window — and it remembers through restarts, so you never get the same alert twice.' },
       { head: 'Twelve languages', body: 'Pick a language and the whole widget switches instantly, AI advice included. Your choice sticks.' },
       { head: 'Stays out of your way', body: 'Turn on click-through and your mouse passes right through it. Adjustable opacity, always on top, no taskbar clutter, drag it anywhere.' },
       { head: 'Zero setup', body: 'The statusLine hook sets itself up. Open Claude Code once and the numbers start flowing. No API key, ever.' },

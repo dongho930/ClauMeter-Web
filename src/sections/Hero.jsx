@@ -15,7 +15,7 @@ export function Hero() {
 
       <div className="cta-row">
         <a className="btn btn-lg" href={LINKS.download}>{t.hero.download}</a>
-        <a className="btn-ghost" href={LINKS.repo}>{t.hero.repo}</a>
+        <a className="btn btn-lg" href={LINKS.downloadMac}>{t.hero.downloadMac}</a>
       </div>
 
       <p className="meta">{t.hero.meta}</p>
