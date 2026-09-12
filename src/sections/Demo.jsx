@@ -99,6 +99,8 @@ export function Demo() {
   // has to come from somewhere that is already current. See setLanguage().
   const winLangRef = useRef(winLang)
   winLangRef.current = winLang
+  const usageRef = useRef(usage)
+  usageRef.current = usage
 
   // ---- the demo only exists once it is nearly on screen -------------------
   // Three iframes and the app's scripts have no business loading with the hero.
@@ -280,6 +282,11 @@ export function Demo() {
       for (const frame of ['widget', 'detail', 'calibrate']) {
         host.emit(frame, 'locale-data', localePayload(code))
       }
+      // renderer.js only rewrites the countdown and the "as of" line when a
+      // reading arrives, so locale-data alone leaves them in the old language.
+      // In the app the next poll fixes that within seconds; the demo's clock can
+      // be paused, so it hands the widget its current reading instead.
+      host.emit('widget', 'usage-update', usageRef.current)
     },
     [host, localePayload]
   )
