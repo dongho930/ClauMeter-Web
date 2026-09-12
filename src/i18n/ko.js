@@ -1,6 +1,6 @@
 export default {
   code: 'ko',
-  nav: { features: '기능', setup: '설치', specs: '사양', download: '다운로드' },
+  nav: { features: '기능', setup: '설치', demo: '체험', specs: '사양', download: '다운로드' },
 
   hero: {
     title: ['멈추기 전에', '미리 보세요.'],
@@ -83,6 +83,34 @@ export default {
         body: '언어, 투명도, 알림. 설정은 이게 전부예요.',
         alt: '언어 드롭다운, 투명도 슬라이더, 사용량 알림 체크박스가 있는 설정 창',
       },
+    ],
+  },
+
+  demo: {
+    title: ['설치 전에', '여기서 써보세요.'],
+    lede: '아래는 스크린샷이 아니라 실제 앱이에요. 위젯을 끌어다 놓고, ⓘ로 페이스 조언을 열고, ⚙에서 언어와 투명도를 바꿔 보세요. 사용량만 아래 컨트롤로 재현한 값이에요.',
+    scenarioLabel: '사용 흐름',
+    scenarios: { calm: '여유', caution: '주의', danger: '위험' },
+    osLabel: '운영체제',
+    os: { win: 'Windows', mac: 'macOS' },
+    play: '재생',
+    pause: '일시정지',
+    timeLabel: '5시간 구간 위치',
+    hint: '흐름을 바꾸면 막대 색과 알림이 어떻게 달라지는지 볼 수 있어요. 위젯은 항상 다른 창 위에 떠 있어요.',
+    relaunch: '위젯 다시 실행',
+    note: '창 안쪽은 실제 앱 화면 그대로예요(같은 코드를 그대로 불러왔어요). 수치는 세 가지 사용 흐름으로 재현한 예시이고, 실제 앱은 Claude Code가 남기는 실측 한도 값을 읽어요. 조언 문장도 데모에서는 미리 써둔 것이지만, 실제 앱은 같은 자리에 AI가 그때그때 쓴 문장을 넣어요.',
+    terminal: [
+      ['dim', '~/projects/api  claude'],
+      ['in', '> 결제 모듈 리팩터링하고 테스트까지 돌려줘'],
+      ['dim', ''],
+      ['run', '● Read  src/billing/charge.ts (412 lines)'],
+      ['run', '● Edit  src/billing/charge.ts'],
+      ['run', '● Bash  npm test -- billing'],
+      ['ok', '  ✓ 24 passed  (3.1s)'],
+      ['dim', ''],
+      ['in', '> 좋아. 웹훅 재시도도 같이 봐줘'],
+      ['run', '● Grep  "retry" (7 files)'],
+      ['dim', '  …'],
     ],
   },
 

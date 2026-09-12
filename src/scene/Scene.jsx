@@ -85,14 +85,16 @@ export function Scene({ reduced, selectedLang, t }) {
         {/* On narrow screens the gallery shows real <img> elements instead. */}
         {!narrow && <Slides chapter={5} dim={intensity} />}
 
-        {/* 6 — datasheet: quiet, but not empty */}
-        <Monolith position={[0.4, 0, -136]} chapter={6} dim={intensity} animate={animate} />
+        {/* 6 — the demo section has no 3D set of its own: it draws a desktop. */}
 
-        {/* 7 — closing */}
+        {/* 7 — datasheet: quiet, but not empty */}
+        <Monolith position={[0.4, 0, -136]} chapter={7} dim={intensity} animate={animate} />
+
+        {/* 8 — closing */}
         <group position={[0, 0, -151]}>
           <DialRig radius={3.1} animate={animate} dim={intensity} presence={closingPresence} />
         </group>
-        <Gauge dim={intensity} chapter={7} chapterWidth={2.2} size={2.4} position={[0, 0, -151]}
+        <Gauge dim={intensity} chapter={8} chapterWidth={2.2} size={2.4} position={[0, 0, -151]}
                v5={0.41} vw={0.22} animate={animate} />
       </group>
 

@@ -1,6 +1,6 @@
 export default {
   code: 'en',
-  nav: { features: 'Features', setup: 'Setup', specs: 'Specs', download: 'Download' },
+  nav: { features: 'Features', setup: 'Setup', demo: 'Demo', specs: 'Specs', download: 'Download' },
 
   hero: {
     title: ['See the limit', 'coming.'],
@@ -83,6 +83,34 @@ export default {
         body: "Language, transparency, alerts. That's the entire list.",
         alt: 'The settings window with a language dropdown, a transparency slider, and a usage-notifications checkbox',
       },
+    ],
+  },
+
+  demo: {
+    title: ['Try it here,', 'before you install.'],
+    lede: "What's below is not a screenshot — it's the app. Drag the widget, open the pace advice with ⓘ, change the language and transparency in ⚙. Only the usage is simulated, with the controls underneath.",
+    scenarioLabel: 'Usage pattern',
+    scenarios: { calm: 'Relaxed', caution: 'Watch it', danger: 'Running out' },
+    osLabel: 'Desktop',
+    os: { win: 'Windows', mac: 'macOS' },
+    play: 'Play',
+    pause: 'Pause',
+    timeLabel: 'Position in the 5-hour window',
+    hint: 'Switch patterns to watch the bars change colour and the notifications fire. The widget stays on top of everything else.',
+    relaunch: 'Relaunch widget',
+    note: 'Inside the window frames is the real application, loaded from the same code that ships. The numbers come from three hand-drawn usage patterns; the installed app reads the actual limit values Claude Code reports. The advice is written out ahead of time here — in the installed app a language model writes it on the spot, in the same place.',
+    terminal: [
+      ['dim', '~/projects/api  claude'],
+      ['in', '> refactor the billing module and run the tests'],
+      ['dim', ''],
+      ['run', '● Read  src/billing/charge.ts (412 lines)'],
+      ['run', '● Edit  src/billing/charge.ts'],
+      ['run', '● Bash  npm test -- billing'],
+      ['ok', '  ✓ 24 passed  (3.1s)'],
+      ['dim', ''],
+      ['in', '> good. check the webhook retries too'],
+      ['run', '● Grep  "retry" (7 files)'],
+      ['dim', '  …'],
     ],
   },
 

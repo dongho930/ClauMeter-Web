@@ -13,6 +13,7 @@ export function TopRail() {
       <nav className="rail-nav">
         <a href="#features">{t.nav.features}</a>
         <a href="#setup">{t.nav.setup}</a>
+        <a href="#demo">{t.nav.demo}</a>
         <a href="#specs">{t.nav.specs}</a>
       </nav>
 

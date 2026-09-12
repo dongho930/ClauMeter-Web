@@ -14,6 +14,7 @@ import { Features } from './sections/Features.jsx'
 import { Steps } from './sections/Steps.jsx'
 import { Languages } from './sections/Languages.jsx'
 import { Gallery } from './sections/Gallery.jsx'
+import { Demo } from './sections/Demo.jsx'
 import { Specs } from './sections/Specs.jsx'
 import { Closing } from './sections/Closing.jsx'
 
@@ -52,6 +53,7 @@ function Site() {
         <Steps />
         <Languages selected={lang3d} onSelect={setLang3d} />
         <Gallery webgl={webgl && !narrow} />
+        <Demo />
         <Specs />
         <Closing />
       </main>

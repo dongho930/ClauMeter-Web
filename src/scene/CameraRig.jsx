@@ -13,8 +13,9 @@ export const KEYS = [
   { pos: [0.0, 0.00, -46.0],  look: [0, 0, -66] },     // 3 setup: fly the gates
   { pos: [0.0, 0.00, -80.5],  look: [0, 0, -94] },     // 4 twelve languages
   { pos: [0.0, 0.00, -104.0], look: [0, 0, -116] },    // 5 the three windows
-  { pos: [1.7, 0.20, -126.0], look: [0.4, 0, -136] },  // 6 datasheet: pull aside
-  { pos: [0.0, 0.00, -142.0], look: [0, 0, -151] },    // 7 closing
+  { pos: [0.0, 0.00, -120.0], look: [0, 0, -130] },    // 6 the demo: a quiet stretch behind it
+  { pos: [1.7, 0.20, -126.0], look: [0.4, 0, -136] },  // 7 datasheet: pull aside
+  { pos: [0.0, 0.00, -142.0], look: [0, 0, -151] },    // 8 closing
 ]
 
 const smooth = (x) => x * x * (3 - 2 * x)
