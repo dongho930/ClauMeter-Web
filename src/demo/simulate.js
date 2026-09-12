@@ -2,9 +2,12 @@
 // main.js sends over IPC, so the real renderer code can't tell the difference.
 //
 // Nothing here is measured. The app reads actual limit percentages out of Claude
-// Code's statusLine hook; a browser has none of that, so the three scenarios below
-// are hand-drawn usage curves — chosen to walk a visitor through the one thing a
-// screenshot can never show, which is the bars changing colour as a window fills.
+// Code's statusLine hook, which a browser has none of. The readings come instead
+// from the session playing out in the demo's terminal: session.js prices every
+// line of that transcript, and the figure below is what those lines add up to.
+// So the bars move because work happened, not because a clock did.
+
+import { SESSIONS, playedFraction, sessionTotal } from './session.js'
 
 export const FIVE_HOUR_MS = 5 * 60 * 60 * 1000
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -17,32 +20,10 @@ const WINDOW_START_HHMM = [9, 52]
 // resetting Saturday morning. Keeps "Resets in 4d 6h" on screen.
 const WEEK_ELAPSED_MS = 2 * 24 * 60 * 60 * 1000 + 18 * 60 * 60 * 1000
 
-// [fraction of the window, usage %] — linearly interpolated. The flat stretches
-// are idle time, which is what makes the projected-usage number interesting:
-// a naive "current pace" estimate overshoots across them, and the app's model
-// is the thing that doesn't.
-const CURVES = {
-  calm: {
-    fiveHour: [[0, 0], [0.12, 7], [0.28, 13], [0.44, 15], [0.6, 25], [0.8, 37], [1, 46]],
-    weekly: [[0, 28], [1, 34]],
-    risk: 'safe',
-  },
-  caution: {
-    fiveHour: [[0, 0], [0.1, 12], [0.25, 28], [0.4, 40], [0.55, 48], [0.7, 62], [0.85, 74], [1, 86]],
-    weekly: [[0, 52], [1, 61]],
-    risk: 'caution',
-  },
-  danger: {
-    fiveHour: [[0, 0], [0.08, 15], [0.2, 35], [0.35, 53], [0.5, 66], [0.62, 79], [0.78, 90], [1, 99]],
-    weekly: [[0, 79], [1, 93]],
-    risk: 'danger',
-  },
-}
-
-export const SCENARIOS = Object.keys(CURVES)
-
-// Where each scenario's curve ends up — which is exactly what the app's model
-// predicts the window will close at, so the detail window can quote it directly.
+// Where each workload lands once its script has played out, which is what the
+// app's model predicts the window will close at — so the detail window quotes it
+// directly, and so does the pace advice, in twelve languages. session.js is built
+// to add up to exactly these; scripts/check-session.mjs keeps them honest.
 const PROJECTED = {
   calm: { fiveHour: 46, weekly: 34 },
   caution: { fiveHour: 86, weekly: 61 },
@@ -50,6 +31,8 @@ const PROJECTED = {
   // so a projection over the limit would render a negative headroom.
   danger: { fiveHour: 98, weekly: 93 },
 }
+
+export const PROJECTED_FOR_TEST = PROJECTED
 
 // Verification numbers from the app's own accuracy log (model error vs. the naive
 // estimate over recent completed windows), kept at the values the site's
@@ -63,18 +46,6 @@ const ACCURACY = {
 // to mean anything (usageModel.isProjectionReliable).
 const PROJECTION_FROM = 0.15
 
-function at(curve, x) {
-  for (let i = 1; i < curve.length; i++) {
-    const [x1, y1] = curve[i]
-    if (x <= x1) {
-      const [x0, y0] = curve[i - 1]
-      const f = x1 === x0 ? 0 : (x - x0) / (x1 - x0)
-      return y0 + (y1 - y0) * f
-    }
-  }
-  return curve[curve.length - 1][1]
-}
-
 // The wall clock the fake window started on, as a real timestamp — the widget
 // renders it with new Date(), so it has to be one.
 export function windowStart() {
@@ -83,15 +54,29 @@ export function windowStart() {
   return d.getTime()
 }
 
+// The 5-hour reading: what the window already stood at when the visitor arrived,
+// plus everything the terminal has run since. Capped at 100 the way the widget
+// caps its own bar.
+export function usedPct(workload, playedCost) {
+  return Math.min(100, (SESSIONS[workload] ?? SESSIONS.calm).base + playedCost)
+}
+
+// The weekly reading tracks progress through the session rather than the clock:
+// a week's worth of limit does not tick away on its own, it is spent.
+function weeklyPct(workload, playedCost) {
+  const [from, to] = (SESSIONS[workload] ?? SESSIONS.calm).weekly
+  return Math.min(100, from + (to - from) * playedFraction(workload, playedCost))
+}
+
 // One `usage-update` payload, shaped exactly like main.js's computePercents().
-export function usageAt(scenario, elapsedMs) {
-  const c = CURVES[scenario] ?? CURVES.calm
-  const f = Math.min(1, Math.max(0, elapsedMs / FIVE_HOUR_MS))
+// `playedCost` is what the terminal has spent; `elapsedMs` only moves the clock
+// and the countdowns, which is the one thing time is still responsible for.
+export function usageAt(workload, playedCost, elapsedMs) {
   return {
-    fiveHourPct: Math.min(100, at(c.fiveHour, f)),
+    fiveHourPct: usedPct(workload, playedCost),
     fiveHourHasData: true,
     fiveHourPending: false,
-    weeklyPct: Math.min(100, at(c.weekly, f)),
+    weeklyPct: weeklyPct(workload, playedCost),
     weeklyHasData: true,
     fiveHourResetInMs: Math.max(0, FIVE_HOUR_MS - elapsedMs),
     weeklyResetInMs: Math.max(0, WEEK_MS - WEEK_ELAPSED_MS - elapsedMs),
@@ -109,11 +94,10 @@ function formatHM(ms) {
 }
 
 // The stats half of `get-usage-advice`, shaped like main.js's buildStats().
-export function statsAt(scenario, elapsedMs) {
-  const p = usageAt(scenario, elapsedMs)
-  const f = Math.min(1, elapsedMs / FIVE_HOUR_MS)
-  const ready = f >= PROJECTION_FROM
-  const proj = PROJECTED[scenario] ?? PROJECTED.calm
+export function statsAt(workload, playedCost, elapsedMs) {
+  const p = usageAt(workload, playedCost, elapsedMs)
+  const ready = elapsedMs / FIVE_HOUR_MS >= PROJECTION_FROM
+  const proj = PROJECTED[workload] ?? PROJECTED.calm
   const round1 = (x) => Math.round(x * 10) / 10
 
   return {
@@ -422,8 +406,8 @@ const ADVICE = {
   },
 }
 
-export function adviceAt(scenario, lang) {
+export function adviceAt(workload, lang) {
   const dict = ADVICE[lang] ?? ADVICE.en
-  const a = dict[scenario] ?? dict.calm
-  return { riskLevel: (CURVES[scenario] ?? CURVES.calm).risk, ...a }
+  const a = dict[workload] ?? dict.calm
+  return { riskLevel: (SESSIONS[workload] ?? SESSIONS.calm).risk, ...a }
 }

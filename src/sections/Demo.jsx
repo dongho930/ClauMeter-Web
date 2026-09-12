@@ -3,7 +3,9 @@ import { useI18n } from '../i18n/index.jsx'
 import { useReducedMotion } from '../hooks/useReducedMotion.js'
 import { useDemoHost } from '../demo/host.js'
 import { LOCALES, SUPPORTED_LANGUAGES, t as tr } from '../demo/locales.js'
-import { FIVE_HOUR_MS, SCENARIOS, adviceAt, statsAt, usageAt } from '../demo/simulate.js'
+import { FIVE_HOUR_MS, adviceAt, statsAt, usageAt } from '../demo/simulate.js'
+import { SESSIONS, WORKLOADS, turnCost } from '../demo/session.js'
+import { useSession } from '../demo/useSession.js'
 
 // A desktop, on the page, running the actual product.
 //
@@ -12,9 +14,13 @@ import { FIVE_HOUR_MS, SCENARIOS, adviceAt, statsAt, usageAt } from '../demo/sim
 // implements. So everything inside the window frames is the real thing: the same
 // markup, the same CSS, the same event handlers, the same twelve languages. This
 // file is only the machine around it — the wallpaper, the taskbar, the window
-// chrome, and the simulated usage that stands in for a Claude Code session.
+// chrome, and the terminal the widget sits on top of.
 //
-// What is *not* real: the numbers. See src/demo/simulate.js.
+// The bars move because the terminal ran something: the session in there is
+// scripted, every line of it is priced, and the widget's reading is what those
+// lines add up to (src/demo/session.js). The visitor can push it along with the
+// prompt buttons or by typing. What is *not* real: the session and its costs.
+// Nothing is executed and nothing leaves the page.
 
 const BASE = import.meta.env.BASE_URL
 
@@ -39,10 +45,14 @@ const HOME = {
   calibrate: [530, 296],
 }
 
-const PLAYBACK_MS = 200
-// A full 5-hour window in a minute of real time: long enough to read the bars
-// moving, short enough that nobody waits for the thresholds.
-const STEPS_PER_WINDOW = 300
+// How fast the demo runs. The multiplier drives the clock and the session's
+// typing and streaming together, so picking a speed speeds up the whole thing
+// rather than desynchronising the two.
+const SPEEDS = [1, 2, 4]
+const DEFAULT_SPEED = 2
+const CLOCK_TICK_MS = 200
+// A 5-hour window in three minutes at 1x, which is 45 seconds at 4x.
+const WINDOW_REAL_MS = 180_000
 
 const THRESHOLDS = [50, 75, 90]
 
@@ -64,9 +74,11 @@ export function Demo() {
 
   const [armed, setArmed] = useState(false)
   const [os, setOs] = useState(detectOs)
-  const [scenario, setScenario] = useState('caution')
+  const [workload, setWorkload] = useState('caution')
   const [playing, setPlaying] = useState(!reduced)
+  const [speed, setSpeed] = useState(DEFAULT_SPEED)
   const [elapsed, setElapsed] = useState(() => FIVE_HOUR_MS * 0.38)
+  const [draft, setDraft] = useState('')
   const [winLang, setWinLang] = useState(siteLang)
   const [opacity, setOpacity] = useState(1)
   const [prefs, setPrefs] = useState({ notificationsEnabled: true, autoUpdateEnabled: true })
@@ -89,7 +101,23 @@ export function Demo() {
   const handlers = useRef({})
   const host = useDemoHost(handlers)
 
-  const usage = useMemo(() => usageAt(scenario, elapsed), [scenario, elapsed])
+  // The human's side of each scripted turn, in the site's language. Tool lines
+  // are not translated: Claude Code prints those in English wherever it runs.
+  const promptText = useCallback((id) => d.prompts[id] ?? id, [d])
+
+  const session = useSession({
+    workload,
+    playing,
+    speed,
+    promptText,
+    adHocReply: d.adHocReply,
+    reduced,
+  })
+
+  const usage = useMemo(
+    () => usageAt(workload, session.played, elapsed),
+    [workload, session.played, elapsed]
+  )
   const inset = os === 'mac' ? MENUBAR : 0
   const elapsedRef = useRef(elapsed)
   elapsedRef.current = elapsed
@@ -133,31 +161,43 @@ export function Demo() {
     return () => ro.disconnect()
   }, [])
 
-  // ---- playback ------------------------------------------------------------
+  // ---- the clock -----------------------------------------------------------
+  // All this moves now is the countdowns and the "as of" time. When the window
+  // runs out it resets, and the session in the terminal starts over with it —
+  // which is the one moment a visitor gets to watch the bars drop to zero.
+  // session is a fresh object on every publish, so it is reached through a ref:
+  // depending on it here rebuilt the interval several times a second.
+  const sessionRef = useRef(session)
+  sessionRef.current = session
+
   useEffect(() => {
     if (!playing || !armed) return
-    const step = FIVE_HOUR_MS / STEPS_PER_WINDOW
+    const step = FIVE_HOUR_MS * (CLOCK_TICK_MS / (WINDOW_REAL_MS / speed))
     const id = setInterval(() => {
-      setElapsed((e) => (e + step >= FIVE_HOUR_MS ? 0 : e + step))
-    }, PLAYBACK_MS)
+      setElapsed((e) => {
+        if (e + step < FIVE_HOUR_MS) return e + step
+        sessionRef.current.reset()
+        return 0
+      })
+    }, CLOCK_TICK_MS)
     return () => clearInterval(id)
-  }, [playing, armed])
+  }, [playing, armed, speed])
 
   // A window that has just reset, or a different usage pattern, is a fresh set of
   // notifications. Thresholds already passed are marked as seen so the only
   // toasts a visitor gets are the ones they watch happen.
-  const primeThresholds = useCallback((at) => {
-    const u = usageAt(at.scenario, at.elapsed)
+  const primeThresholds = useCallback((nextWorkload) => {
+    const u = usageAt(nextWorkload, 0, elapsedRef.current)
     fired.current = {
       fiveHour: new Set(THRESHOLDS.filter((x) => u.fiveHourPct >= x)),
       weekly: new Set(THRESHOLDS.filter((x) => u.weeklyPct >= x)),
     }
   }, [])
 
+  // A new workload, or a window that just reset, is a fresh set of notifications.
   useEffect(() => {
-    primeThresholds({ scenario, elapsed: elapsedRef.current })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario, primeThresholds])
+    primeThresholds(workload)
+  }, [workload, primeThresholds])
 
   const pushToast = useCallback((body) => {
     const id = Math.random().toString(36).slice(2)
@@ -182,6 +222,20 @@ export function Demo() {
       for (const th of THRESHOLDS) if (pct < th) fired.current[key].delete(th)
     }
   }, [usage, open.widget, prefs.notificationsEnabled, winLang, pushToast])
+
+  // A prompt from a chip or from the input. Sending while paused presses play:
+  // asking for something and watching nothing happen would read as broken.
+  const sendPrompt = useCallback((turnIndex, typedText) => {
+    setPlaying(true)
+    sessionRef.current.send(turnIndex, typedText)
+  }, [])
+
+  const restart = useCallback(() => {
+    sessionRef.current.reset()
+    setElapsed(FIVE_HOUR_MS * 0.38)
+    primeThresholds(workload)
+    setPlaying(true)
+  }, [primeThresholds, workload])
 
   // ---- windows -------------------------------------------------------------
   const focusWindow = useCallback((frame) => {
@@ -325,8 +379,8 @@ export function Demo() {
       return {
         structured: true,
         cached,
-        advice: adviceAt(scenario, winLangRef.current),
-        stats: statsAt(scenario, elapsed),
+        advice: adviceAt(workload, winLangRef.current),
+        stats: statsAt(workload, session.played, elapsed),
       }
     },
     'calibrate-opacity-preview': (value) => setOpacity(value),
@@ -352,7 +406,7 @@ export function Demo() {
     (frame) => {
       host.emit(frame, 'locale-data', localePayload(winLang))
       if (frame === 'widget') {
-        host.emit('widget', 'usage-update', usageAt(scenario, elapsed))
+        host.emit('widget', 'usage-update', usageAt(workload, session.played, elapsed))
         host.emit('widget', 'clickthrough:state', clickThrough)
       }
       if (frame === 'calibrate') {
@@ -366,7 +420,7 @@ export function Demo() {
         })
       }
     },
-    [host, localePayload, winLang, scenario, elapsed, clickThrough, opacity, prefs]
+    [host, localePayload, winLang, workload, session.played, elapsed, clickThrough, opacity, prefs]
   )
 
   useEffect(() => {
@@ -380,7 +434,7 @@ export function Demo() {
   useEffect(() => {
     if (open.detail) host.emit('detail', 'locale-data', localePayload(winLang))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario])
+  }, [workload])
 
   // ---- render --------------------------------------------------------------
   const frames = [
@@ -411,7 +465,18 @@ export function Demo() {
             <MacMenuBar clock={hhmm(usage.updatedAt)} lang={winLang} />
           ) : null}
 
-          <FakeTerminal lines={d.terminal} inset={inset} os={os} />
+          <Terminal
+            d={d}
+            os={os}
+            inset={inset}
+            workload={workload}
+            log={session.log}
+            typed={session.typed}
+            busy={session.busy}
+            draft={draft}
+            setDraft={setDraft}
+            onSend={sendPrompt}
+          />
 
           {armed &&
             frames.map(({ frame, src, title }) =>
@@ -464,13 +529,15 @@ export function Demo() {
         d={d}
         os={os}
         setOs={setOs}
-        scenario={scenario}
-        setScenario={setScenario}
+        workload={workload}
+        setWorkload={setWorkload}
         playing={playing}
         setPlaying={setPlaying}
-        elapsed={elapsed}
-        setElapsed={setElapsed}
+        speed={speed}
+        setSpeed={setSpeed}
+        onRestart={restart}
         clock={hhmm(usage.updatedAt)}
+        used={usage.fiveHourPct}
       />
 
       <p className="dtop-note">{d.note}</p>
@@ -583,18 +650,52 @@ function MacMenuBar({ clock, lang }) {
   )
 }
 
-// Something for the widget to sit on top of, so "always on top, out of the way"
-// is visible rather than asserted. Decorative: no controls, not in the a11y tree.
-// The shell prompt is the one line of the session that differs between the two
-// systems, so it is drawn here rather than translated.
+// The session the widget is watching. Not decoration any more: it types, it
+// streams, it takes prompts, and every line it prints is what moves the bars.
+//
+// The shell prompt is the one line that differs between the two systems, so it is
+// drawn here rather than translated.
 const PROMPT = {
   win: 'C:\\projects\\api> claude',
   mac: '~/projects/api % claude',
 }
 
-function FakeTerminal({ lines, inset, os }) {
+// Nothing here is ever disabled: a prompt sent mid-turn is queued, which is what
+// Claude Code does with a message you send while it is working. Disabling on busy
+// meant pausing mid-turn locked the terminal for good.
+function Terminal({
+  d,
+  os,
+  inset,
+  workload,
+  log,
+  typed,
+  busy,
+  onSend,
+  draft,
+  setDraft,
+}) {
+  const body = useRef(null)
+
+  // A terminal that does not follow its own output is a terminal nobody believes.
+  useEffect(() => {
+    const el = body.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [log, typed])
+
+  const submit = (e) => {
+    e.preventDefault()
+    const text = draft.trim()
+    if (!text) return
+    setDraft('')
+    onSend(null, text)
+  }
+
   return (
-    <div className="dterm" style={{ top: 70 + inset }} aria-hidden="true">
+    // data-busy is what a turn being in flight looks like from the outside: the
+    // cursor cannot say it, since it belongs to the prompt line and that line is
+    // hidden while output streams.
+    <div className="dterm" data-busy={busy ? 'true' : 'false'} style={{ top: 70 + inset }}>
       <div className="dterm-bar">
         {os === 'mac' ? (
           <span className="dterm-lights">
@@ -602,69 +703,143 @@ function FakeTerminal({ lines, inset, os }) {
             <span />
             <span />
           </span>
-        ) : (
-          <>
-            <span className="dterm-name">claude</span>
-            <span className="dterm-wbtns">
-              <span>&#x2500;</span>
-              <span>&#x2610;</span>
-              <span>&#x2715;</span>
-            </span>
-          </>
-        )}
+        ) : null}
+        {/* Says what this is, permanently. The three windows on this desktop are
+            the real application; this one is a staged session, and a visitor
+            should never have to guess which is which. */}
+        <span className="dterm-name">claude — {d.sessionTag}</span>
+        {os === 'win' ? (
+          <span className="dterm-wbtns">
+            <span>&#x2500;</span>
+            <span>&#x2610;</span>
+            <span>&#x2715;</span>
+          </span>
+        ) : null}
       </div>
-      <pre>
-        <span className="dterm-dim">
-          {PROMPT[os]}
-          {'\n'}
-        </span>
-        {lines.map((l, i) => (
-          <span className={`dterm-${l[0]}`} key={i}>
-            {l[1]}
+
+      <div className="dterm-body" ref={body}>
+        <pre role="log" aria-live="polite" aria-label={d.transcriptLabel}>
+          <span className="dterm-dim">
+            {PROMPT[os]}
             {'\n'}
           </span>
-        ))}
-      </pre>
+          {log.map((l) => (
+            <span className={`dterm-${l.kind}`} key={l.id}>
+              {l.text}
+              {'\n'}
+            </span>
+          ))}
+          {/* One live line: the prompt being typed, or an empty one with a cursor
+              while the session waits for you. Hidden while output is streaming,
+              because the prompt is in the scrollback by then. */}
+          {(typed !== null || !busy) && (
+            <span className="dterm-live dterm-in">
+              {`> ${typed ?? ''}`}
+              <span className="dterm-caret" />
+              {'\n'}
+            </span>
+          )}
+        </pre>
+      </div>
+
+      <div className="dterm-ask">
+        <div className="dterm-chips">
+          {SESSIONS[workload].turns.map((turn, i) => (
+            <button
+              key={turn.prompt}
+              type="button"
+              className="dterm-chip"
+              onClick={() => onSend(i)}
+              title={d.prompts[turn.prompt]}
+            >
+              <span className="dterm-chip-text">{d.prompts[turn.prompt]}</span>
+              <Weight cost={turnCost(workload, i)} label={d.weightLabel} />
+            </button>
+          ))}
+        </div>
+        <form className="dterm-form" onSubmit={submit}>
+          <span className="dterm-form-mark" aria-hidden="true">
+            &gt;
+          </span>
+          <input
+            className="dterm-input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={busy ? d.inputQueue : d.inputPlaceholder}
+            aria-label={d.inputPlaceholder}
+            maxLength={120}
+            spellCheck="false"
+            autoComplete="off"
+          />
+        </form>
+      </div>
     </div>
   )
 }
 
-function Controls({ d, os, setOs, scenario, setScenario, playing, setPlaying, elapsed, setElapsed, clock }) {
+// How heavy a prompt is, without quoting a made-up percentage at anyone: three
+// bars, filled by what the turn costs relative to a full window.
+function Weight({ cost, label }) {
+  const level = cost >= 12 ? 3 : cost >= 6 ? 2 : 1
+  return (
+    <span className="dterm-weight" title={`${label}: ${'▮'.repeat(level)}`} aria-hidden="true">
+      {[1, 2, 3].map((i) => (
+        <i className={i <= level ? 'on' : ''} key={i} />
+      ))}
+    </span>
+  )
+}
+
+function Controls({
+  d,
+  os,
+  setOs,
+  workload,
+  setWorkload,
+  playing,
+  setPlaying,
+  speed,
+  setSpeed,
+  onRestart,
+  clock,
+  used,
+}) {
   return (
     <div className="dctl">
       <div className="dctl-row">
-        <span className="dctl-label">{d.scenarioLabel}</span>
-        <div className="dctl-seg" role="group" aria-label={d.scenarioLabel}>
-          {SCENARIOS.map((s) => (
+        <span className="dctl-label">{d.workloadLabel}</span>
+        <div className="dctl-seg" role="group" aria-label={d.workloadLabel}>
+          {WORKLOADS.map((w) => (
             <button
-              key={s}
-              className={scenario === s ? 'on' : ''}
-              aria-pressed={scenario === s}
-              onClick={() => setScenario(s)}
+              key={w}
+              className={workload === w ? 'on' : ''}
+              aria-pressed={workload === w}
+              onClick={() => setWorkload(w)}
             >
-              {d.scenarios[s]}
+              {d.workloads[w]}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="dctl-row dctl-time">
+      <div className="dctl-row">
         <button className="dctl-play" onClick={() => setPlaying((p) => !p)}>
           {playing ? d.pause : d.play}
         </button>
-        <input
-          type="range"
-          min="0"
-          max={FIVE_HOUR_MS}
-          step={FIVE_HOUR_MS / STEPS_PER_WINDOW}
-          value={elapsed}
-          aria-label={d.timeLabel}
-          onChange={(e) => {
-            setPlaying(false)
-            setElapsed(Number(e.target.value))
-          }}
-        />
-        <span className="dctl-clock val">{clock}</span>
+        <button className="dctl-play" onClick={onRestart}>
+          {d.restart}
+        </button>
+      </div>
+
+      <div className="dctl-row">
+        <span className="dctl-label">{d.speedLabel}</span>
+        <div className="dctl-seg" role="group" aria-label={d.speedLabel}>
+          {SPEEDS.map((x) => (
+            <button key={x} className={speed === x ? 'on' : ''} aria-pressed={speed === x} onClick={() => setSpeed(x)}>
+              {x}&times;
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="dctl-row">
@@ -676,6 +851,11 @@ function Controls({ d, os, setOs, scenario, setScenario, playing, setPlaying, el
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="dctl-row dctl-readout">
+        <span className="dctl-clock val">{clock}</span>
+        <span className="dctl-used val">{d.usedLabel.replace('{x}', Math.round(used))}</span>
       </div>
 
       <p className="dctl-hint">{d.hint}</p>
