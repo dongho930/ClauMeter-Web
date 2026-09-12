@@ -10,7 +10,7 @@ import { SESSIONS, adHocTurn } from './session.js'
 // renders a second rather than one per tick.
 
 const TICK_MS = 50
-const TYPE_MS = 30 // per character, at 1x
+const TYPE_MS = 30 // per character
 const THINK_MS = 450 // between the prompt landing and the first tool line
 const BETWEEN_TURNS_MS = 4200 // how long the session rests before asking again
 const MAX_LINES = 60 // the transcript is a window, not a log file
@@ -35,7 +35,7 @@ function blank(workload) {
 
 let seq = 0
 
-export function useSession({ workload, playing, speed, promptText, adHocReply, reduced }) {
+export function useSession({ workload, playing, promptText, adHocReply, reduced }) {
   const m = useRef(blank(workload))
   // What the terminal draws. Kept as one object so a tick that changes nothing
   // visible costs no render.
@@ -103,7 +103,9 @@ export function useSession({ workload, playing, speed, promptText, adHocReply, r
     if (!playing) return
     const id = setInterval(() => {
       const s = m.current
-      const step = TICK_MS * speed
+      // The session runs at the pace it is written at, whatever the clock is
+      // doing: a transcript flying past at 300x would be unreadable.
+      const step = TICK_MS
 
       if (s.wait > 0) {
         s.wait -= step
@@ -168,7 +170,7 @@ export function useSession({ workload, playing, speed, promptText, adHocReply, r
       publish()
     }, TICK_MS)
     return () => clearInterval(id)
-  }, [playing, speed, reduced, begin, publish])
+  }, [playing, reduced, begin, publish])
 
   return useMemo(() => ({ ...view, send, reset }), [view, send, reset])
 }

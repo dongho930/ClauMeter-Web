@@ -114,7 +114,12 @@ export default {
     workloads: { calm: '가벼운 작업', caution: '모듈 리팩터링', danger: '전역 리네이밍' },
     osLabel: '운영체제',
     os: { win: 'Windows', mac: 'macOS' },
-    speedLabel: '속도',
+    speedLabel: '시계',
+    speedTitles: {
+      1: '실제 시간 — 1분이 1분',
+      60: '5시간 구간을 5분에',
+      300: '5시간 구간을 1분에',
+    },
     play: '재생',
     pause: '일시정지',
     restart: '새 구간 시작',

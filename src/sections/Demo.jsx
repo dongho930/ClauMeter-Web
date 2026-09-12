@@ -45,14 +45,21 @@ const HOME = {
   calibrate: [530, 296],
 }
 
-// How fast the demo runs. The multiplier drives the clock and the session's
-// typing and streaming together, so picking a speed speeds up the whole thing
-// rather than desynchronising the two.
-const SPEEDS = [1, 2, 4]
-const DEFAULT_SPEED = 2
-const CLOCK_TICK_MS = 200
-// A 5-hour window in three minutes at 1x, which is 45 seconds at 4x.
-const WINDOW_REAL_MS = 180_000
+// How fast the demo's clock runs. 1x is real time: the countdown ticks a minute
+// per minute and the 5-hour window really does take five hours, which is the
+// honest baseline. The multipliers only compress the waiting.
+//
+// The session in the terminal is *not* multiplied. Its delays are already written
+// at a real pace — a tool call takes about a second — so at 1x the whole demo is
+// real time, and at 300x the transcript stays readable while the clock flies.
+// Scaling both would make the terminal unreadable at anything but 1x, which is
+// the part nobody wants to speed up.
+const SPEEDS = [1, 60, 300]
+const DEFAULT_SPEED = 60
+// The clock advances CLOCK_TICK_MS x speed of demo time per tick. At 1x a whole
+// second of demo time per tick is plenty (the widget only shows minutes) and
+// saves four renders a second for five hours.
+const clockTick = (speed) => Math.max(200, Math.round(1000 / speed))
 
 const THRESHOLDS = [50, 75, 90]
 
@@ -108,7 +115,6 @@ export function Demo() {
   const session = useSession({
     workload,
     playing,
-    speed,
     promptText,
     adHocReply: d.adHocReply,
     reduced,
@@ -172,14 +178,15 @@ export function Demo() {
 
   useEffect(() => {
     if (!playing || !armed) return
-    const step = FIVE_HOUR_MS * (CLOCK_TICK_MS / (WINDOW_REAL_MS / speed))
+    const tick = clockTick(speed)
+    const step = tick * speed
     const id = setInterval(() => {
       setElapsed((e) => {
         if (e + step < FIVE_HOUR_MS) return e + step
         sessionRef.current.reset()
         return 0
       })
-    }, CLOCK_TICK_MS)
+    }, tick)
     return () => clearInterval(id)
   }, [playing, armed, speed])
 
@@ -835,7 +842,13 @@ function Controls({
         <span className="dctl-label">{d.speedLabel}</span>
         <div className="dctl-seg" role="group" aria-label={d.speedLabel}>
           {SPEEDS.map((x) => (
-            <button key={x} className={speed === x ? 'on' : ''} aria-pressed={speed === x} onClick={() => setSpeed(x)}>
+            <button
+              key={x}
+              className={speed === x ? 'on' : ''}
+              aria-pressed={speed === x}
+              title={d.speedTitles[x]}
+              onClick={() => setSpeed(x)}
+            >
               {x}&times;
             </button>
           ))}

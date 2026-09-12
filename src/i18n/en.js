@@ -114,7 +114,12 @@ export default {
     workloads: { calm: 'Light edits', caution: 'Module refactor', danger: 'Project-wide rename' },
     osLabel: 'Desktop',
     os: { win: 'Windows', mac: 'macOS' },
-    speedLabel: 'Speed',
+    speedLabel: 'Clock',
+    speedTitles: {
+      1: 'real time — a minute is a minute',
+      60: 'a 5-hour window in 5 minutes',
+      300: 'a 5-hour window in 1 minute',
+    },
     play: 'Play',
     pause: 'Pause',
     restart: 'New window',
