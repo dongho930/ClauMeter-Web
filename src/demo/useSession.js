@@ -12,7 +12,10 @@ import { SESSIONS, adHocTurn } from './session.js'
 const TICK_MS = 50
 const TYPE_MS = 30 // per character
 const THINK_MS = 450 // between the prompt landing and the first tool line
-const BETWEEN_TURNS_MS = 4200 // how long the session rests before asking again
+// How long the session rests before asking for the next thing. Long enough that
+// the bars visibly settle between turns: at 4.2s the widget never stopped moving,
+// which is what made the climb feel like a slot machine rather than an afternoon.
+const BETWEEN_TURNS_MS = 11_000
 const MAX_LINES = 60 // the transcript is a window, not a log file
 
 // A blank machine, at the top of a fresh 5-hour window.

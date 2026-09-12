@@ -7,7 +7,7 @@
 // line of that transcript, and the figure below is what those lines add up to.
 // So the bars move because work happened, not because a clock did.
 
-import { SESSIONS, playedFraction, sessionTotal } from './session.js'
+import { SESSIONS, WEEKLY_PER_POINT, weeklyStart } from './session.js'
 
 export const FIVE_HOUR_MS = 5 * 60 * 60 * 1000
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -61,11 +61,13 @@ export function usedPct(workload, playedCost) {
   return Math.min(100, (SESSIONS[workload] ?? SESSIONS.calm).base + playedCost)
 }
 
-// The weekly reading tracks progress through the session rather than the clock:
-// a week's worth of limit does not tick away on its own, it is spent.
+// The weekly reading is spent, not ticked away: it climbs at a fixed rate per
+// point of 5-hour usage. Deriving it from progress through the script instead
+// meant it stopped dead once a visitor asked for more than the script contained,
+// while the 5-hour bar kept going.
 function weeklyPct(workload, playedCost) {
-  const [from, to] = (SESSIONS[workload] ?? SESSIONS.calm).weekly
-  return Math.min(100, from + (to - from) * playedFraction(workload, playedCost))
+  const w = SESSIONS[workload] ? workload : 'calm'
+  return Math.min(100, weeklyStart(w) + playedCost * WEEKLY_PER_POINT)
 }
 
 // One `usage-update` payload, shaped exactly like main.js's computePercents().

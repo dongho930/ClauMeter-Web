@@ -33,9 +33,10 @@ for (const workload of S.WORKLOADS) {
   )
 }
 
-// The weekly endpoints are quoted the same way.
+// The weekly endpoints are quoted the same way. Their starts are worked backwards
+// from them at a fixed rate, so this is the only weekly figure to pin.
 for (const workload of S.WORKLOADS) {
-  const [, end] = S.SESSIONS[workload].weekly
+  const end = S.SESSIONS[workload].weeklyEnd
   const quoted = PROJECTED[workload].weekly
   if (end !== quoted) {
     bad++
