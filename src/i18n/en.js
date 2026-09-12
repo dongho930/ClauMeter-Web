@@ -112,8 +112,8 @@ export default {
   },
 
   cta: {
-    title: 'Never hit the limit blind again.',
-    lede: 'One installer. No account, no API key, nothing to configure.',
+    title: 'Stop guessing.',
+    lede: 'The Claude Code limit widget that shows measured numbers.',
   },
 
   footer: {

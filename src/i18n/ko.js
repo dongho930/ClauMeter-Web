@@ -112,8 +112,8 @@ export default {
   },
 
   cta: {
-    title: '갑자기 막히는 일, 이제 그만.',
-    lede: '설치 파일 하나면 끝. 계정도, API 키도, 설정도 필요 없어요.',
+    title: '더 이상 감으로 쓰지 마세요.',
+    lede: '정확한 Claude Code 실측 리밋 위젯.',
   },
 
   footer: {

@@ -1,25 +1,30 @@
 import { useState } from 'react'
 import { useI18n, fill } from '../i18n/index.jsx'
-import { VERSION, SHA256 } from '../config.js'
+import { useRelease } from '../release.jsx'
 
 // The datasheet. The 3D goes dark here and the page turns into a printed sheet:
 // this is the section people read before they trust the download.
 export function Specs() {
   const { t } = useI18n()
+  const { version, sha256 } = useRelease()
   const [open, setOpen] = useState(0)
+
+  // A release with no published digest drops the checksum row rather than
+  // printing a hash that belongs to some other build.
+  const reqs = sha256 ? t.specs.reqs : t.specs.reqs.filter(([, v]) => !v.includes('{sha256}'))
 
   return (
     <section id="specs" data-chapter className="specs">
       <div className="sheet">
         <div className="sheet-head">
           <h2>{t.specs.title}</h2>
-          <span className="val sheet-stamp">ClauMeter {VERSION}</span>
+          <span className="val sheet-stamp">ClauMeter {version}</span>
         </div>
 
         <h3 className="sheet-sub">{t.specs.reqTitle}</h3>
         <dl className="sheet-table">
-          {t.specs.reqs.map(([k, v], i) => {
-            const value = fill(v, { version: VERSION, sha256: SHA256 })
+          {reqs.map(([k, v], i) => {
+            const value = fill(v, { version, sha256 })
             return (
               <div className="sheet-row" key={i}>
                 <dt>{k}</dt>

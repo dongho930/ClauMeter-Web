@@ -1,9 +1,10 @@
 import { Fragment } from 'react'
 import { useI18n, fill } from '../i18n/index.jsx'
-import { INSTALLER } from '../config.js'
+import { useRelease } from '../release.jsx'
 
 export function Steps() {
   const { t } = useI18n()
+  const { installer } = useRelease()
 
   return (
     <section id="setup" data-chapter className="steps">
@@ -19,7 +20,7 @@ export function Steps() {
             <span className="step-n val" aria-hidden="true">{i + 1}</span>
             <div>
               <h3>{s.head}</h3>
-              <p>{withFilename(fill(s.body, { installer: INSTALLER }))}</p>
+              <p>{withFilename(fill(s.body, { installer }), installer)}</p>
             </div>
           </li>
         ))}
@@ -30,13 +31,13 @@ export function Steps() {
 
 // The installer filename is a machine string, so set it as one. Split rather
 // than inject: no markup ever goes through innerHTML.
-function withFilename(text) {
-  const parts = text.split(INSTALLER)
+function withFilename(text, installer) {
+  const parts = text.split(installer)
   if (parts.length === 1) return text
   return parts.map((part, i) => (
     <Fragment key={i}>
       {part}
-      {i < parts.length - 1 && <code className="val">{INSTALLER}</code>}
+      {i < parts.length - 1 && <code className="val">{installer}</code>}
     </Fragment>
   ))
 }

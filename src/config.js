@@ -1,5 +1,10 @@
 const REPO = 'https://github.com/dongho930/ClauMeter'
 
+// Everything below is the *fallback* release: what the page shows for the few
+// hundred milliseconds before GitHub answers, and what it keeps showing if the
+// API never does (rate limit, offline, blocked). The live numbers come from
+// useRelease() — see release.jsx. Keep this pointing at a release that really
+// exists, because a broken download is worse than an old one.
 export const VERSION = 'v1.1.0'
 
 // GitHub rewrites the spaces in an uploaded asset's name as dots, so the file
@@ -16,10 +21,10 @@ export const MAC_INSTALLER = `ClauMeter-${VERSION.slice(1)}-universal.dmg`
 // Re-take after each build with: Get-FileHash "dist/ClauMeter Setup 1.1.0.exe" -Algorithm SHA256
 export const SHA256 = '3d5db319447a2d2898172fd21d45a5b34aba42a71f879369d8ebd77df67e1b50'
 
+// The releases API GitHub is asked for the current version and its assets.
+export const RELEASE_API = 'https://api.github.com/repos/dongho930/ClauMeter/releases/latest'
+
 export const LINKS = {
-  // Pinned to this version on purpose: the asset name carries the version, so
-  // "/releases/latest/download/..." would break on the next release. Bumping
-  // VERSION above moves both download links with it.
   download: `${REPO}/releases/download/${VERSION}/${INSTALLER}`,
   downloadMac: `${REPO}/releases/download/${VERSION}/${MAC_INSTALLER}`,
   repo: REPO,

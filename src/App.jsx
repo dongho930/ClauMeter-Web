@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { I18nProvider, useI18n } from './i18n/index.jsx'
+import { ReleaseProvider } from './release.jsx'
 import { initScroll } from './scroll.js'
 import { useReducedMotion, useNarrow, hasWebGL } from './hooks/useReducedMotion.js'
 // The 3D is a second act: the page must be readable and clickable before
@@ -19,7 +20,9 @@ import { Closing } from './sections/Closing.jsx'
 export default function App() {
   return (
     <I18nProvider>
-      <Site />
+      <ReleaseProvider>
+        <Site />
+      </ReleaseProvider>
     </I18nProvider>
   )
 }
