@@ -54,36 +54,58 @@ export function windowStart() {
   return d.getTime()
 }
 
-// The 5-hour reading: what the window already stood at when the visitor arrived,
-// plus everything the terminal has run since. Capped at 100 the way the widget
-// caps its own bar.
-export function usedPct(workload, playedCost) {
-  return Math.min(100, (SESSIONS[workload] ?? SESSIONS.calm).base + playedCost)
+// What the terminal has spent, and the two clocks those two figures belong to:
+//
+//   window   this 5-hour window only, zeroed when it resets
+//   week     since the week began, which a 5-hour reset does not touch
+//
+// Keeping them apart is the whole reason a weekly limit means anything: the
+// 5-hour window comes back every five hours, the week does not. While both were
+// read off one counter, the weekly bar dropped back every time the window reset
+// and could never actually run out.
+const only = (workload) => (SESSIONS[workload] ? workload : 'calm')
+
+// The 5-hour reading: where the window already stood when the visitor arrived,
+// plus what has run since. Capped at 100 the way the widget caps its own bar.
+export function usedPct(workload, spent) {
+  return Math.min(100, SESSIONS[only(workload)].base + spent.window)
 }
 
 // The weekly reading is spent, not ticked away: it climbs at a fixed rate per
-// point of 5-hour usage. Deriving it from progress through the script instead
-// meant it stopped dead once a visitor asked for more than the script contained,
-// while the 5-hour bar kept going.
-function weeklyPct(workload, playedCost) {
-  const w = SESSIONS[workload] ? workload : 'calm'
-  return Math.min(100, weeklyStart(w) + playedCost * WEEKLY_PER_POINT)
+// point of 5-hour usage, and it carries across window resets.
+export function weeklyPct(workload, spent) {
+  return Math.min(100, weeklyStart(only(workload)) + spent.week * WEEKLY_PER_POINT)
+}
+
+// Which limit, if either, has run out — the one place the rule lives, read by
+// both the terminal (which stops) and the controls (which say why).
+export function blockedBy(workload, spent) {
+  if (usedPct(workload, spent) >= 100) return 'fiveHour'
+  if (weeklyPct(workload, spent) >= 100) return 'weekly'
+  return null
 }
 
 // One `usage-update` payload, shaped exactly like main.js's computePercents().
-// `playedCost` is what the terminal has spent; `elapsedMs` only moves the clock
-// and the countdowns, which is the one thing time is still responsible for.
-export function usageAt(workload, playedCost, elapsedMs) {
+// `elapsedMs` only moves the clock and the countdowns, which is the one thing
+// time is still responsible for.
+export function usageAt(workload, spent, elapsedMs) {
   return {
-    fiveHourPct: usedPct(workload, playedCost),
+    fiveHourPct: usedPct(workload, spent),
     fiveHourHasData: true,
     fiveHourPending: false,
-    weeklyPct: weeklyPct(workload, playedCost),
+    weeklyPct: weeklyPct(workload, spent),
     weeklyHasData: true,
     fiveHourResetInMs: Math.max(0, FIVE_HOUR_MS - elapsedMs),
     weeklyResetInMs: Math.max(0, WEEK_MS - WEEK_ELAPSED_MS - elapsedMs),
     updatedAt: windowStart() + elapsedMs,
   }
+}
+
+// When the 5-hour window comes back, as a wall-clock time — what the app's own
+// "resets at" line would say.
+export function resetsAt() {
+  const d = new Date(windowStart() + FIVE_HOUR_MS)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 function formatHM(ms) {
@@ -96,8 +118,8 @@ function formatHM(ms) {
 }
 
 // The stats half of `get-usage-advice`, shaped like main.js's buildStats().
-export function statsAt(workload, playedCost, elapsedMs) {
-  const p = usageAt(workload, playedCost, elapsedMs)
+export function statsAt(workload, spent, elapsedMs) {
+  const p = usageAt(workload, spent, elapsedMs)
   const ready = elapsedMs / FIVE_HOUR_MS >= PROJECTION_FROM
   const proj = PROJECTED[workload] ?? PROJECTED.calm
   const round1 = (x) => Math.round(x * 10) / 10

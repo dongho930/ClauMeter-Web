@@ -300,6 +300,12 @@ button.db-close:hover {
   color: #5d6b78;
 }
 
+/* The line that says a limit has run out. The app's own redline colour, because
+   it is the same event the widget's bar is reporting. */
+.dterm-stop {
+  color: #f0533f;
+}
+
 /* ---- taskbar / menu bar ------------------------------------------------- */
 .dbar {
   position: absolute;
@@ -691,4 +697,24 @@ button.db-close:hover {
 
 .dctl-used {
   color: var(--paper-dim);
+}
+
+/* Nothing can be sent once a limit is spent, and the row says so rather than
+   just going quietly inert. */
+.dterm-ask.is-blocked {
+  background: #1a1416;
+  border-top-color: rgba(240, 83, 63, 0.35);
+}
+
+.dterm-ask.is-blocked .dterm-form {
+  border-color: rgba(240, 83, 63, 0.4);
+}
+
+.dterm-ask.is-blocked .dterm-input::placeholder {
+  color: #b8776c;
+}
+
+.dctl-blocked {
+  color: var(--redline);
+  font-size: var(--t-sm);
 }

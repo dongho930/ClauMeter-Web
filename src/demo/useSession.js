@@ -18,12 +18,17 @@ const THINK_MS = 450 // between the prompt landing and the first tool line
 const BETWEEN_TURNS_MS = 11_000
 const MAX_LINES = 60 // the transcript is a window, not a log file
 
-// A blank machine, at the top of a fresh 5-hour window.
-function blank(workload) {
+// A blank machine. `carry` is what the week has spent so far: a fresh 5-hour
+// window inherits it, a fresh week does not.
+function blank(workload, carry = 0) {
   return {
     workload,
     log: [],
+    // What this 5-hour window has spent, and what the week has. The window
+    // figure is zeroed every five hours; the week's is not.
     played: 0,
+    week: carry,
+    refused: false, // the "limit reached" line is printed once, not per tick
     turn: null, // the turn being performed
     lineAt: 0, // how many of its lines have printed
     typed: '', // the prompt text so far, while it is being typed
@@ -38,25 +43,49 @@ function blank(workload) {
 
 let seq = 0
 
-export function useSession({ workload, playing, promptText, adHocReply, reduced }) {
+// `blockFor` is asked, with what has been spent, whether a limit has run out. It
+// is a predicate rather than a flag so the answer is current at the instant a
+// cost lands, instead of a render behind it.
+export function useSession({ workload, playing, promptText, adHocReply, reduced, blockFor }) {
   const m = useRef(blank(workload))
+  const blockRef = useRef(blockFor)
+  blockRef.current = blockFor
   // What the terminal draws. Kept as one object so a tick that changes nothing
   // visible costs no render.
-  const [view, setView] = useState(() => ({ log: [], typed: null, played: 0, busy: false, done: false }))
+  const [view, setView] = useState(() => ({
+    log: [],
+    typed: null,
+    spent: { window: 0, week: 0 },
+    blocked: null,
+    busy: false,
+    done: false,
+  }))
 
   const publish = useCallback(() => {
     const s = m.current
+    const spent = { window: s.played, week: s.week }
     setView({
       log: s.log,
       // Non-null only while a prompt is actually being typed.
       typed: s.turn && s.typed !== null ? s.typed : null,
-      played: s.played,
+      spent,
+      blocked: blockRef.current(spent),
       busy: !!s.turn,
       done: s.done,
     })
   }, [])
 
-  const reset = useCallback(
+  // The 5-hour window came back: the transcript and this window's spend go, what
+  // the week has spent stays. That is the difference between the two limits, and
+  // the only way the weekly one can ever actually run out.
+  const newWindow = useCallback(() => {
+    m.current = blank(m.current.workload, m.current.week)
+    publish()
+  }, [publish])
+
+  // A clean slate for both, which is what the restart button and a change of
+  // workload mean.
+  const newWeek = useCallback(
     (nextWorkload = m.current.workload) => {
       m.current = blank(nextWorkload)
       publish()
@@ -64,10 +93,9 @@ export function useSession({ workload, playing, promptText, adHocReply, reduced 
     [publish]
   )
 
-  // Switching workload starts a new session — the old transcript belongs to it.
   useEffect(() => {
-    reset(workload)
-  }, [workload, reset])
+    newWeek(workload)
+  }, [workload, newWeek])
 
   const begin = useCallback((turn, typedText) => {
     const s = m.current
@@ -84,6 +112,7 @@ export function useSession({ workload, playing, promptText, adHocReply, reduced 
   const send = useCallback(
     (turnIndex, typedText) => {
       const s = m.current
+      if (blockRef.current({ window: s.played, week: s.week })) return
       const turn =
         turnIndex == null
           ? adHocTurn(typedText, adHocReply)
@@ -106,6 +135,25 @@ export function useSession({ workload, playing, promptText, adHocReply, reduced 
     if (!playing) return
     const id = setInterval(() => {
       const s = m.current
+
+      // A limit has run out. Claude Code refuses to send, so the session stops
+      // where it is: the turn in flight is abandoned mid-way, nothing queued
+      // starts, and the refusal is printed once.
+      const hit = blockRef.current({ window: s.played, week: s.week })
+      if (hit) {
+        if (!s.refused) {
+          s.refused = true
+          s.turn = null
+          s.typed = null
+          s.pending = ''
+          s.queued = null
+          s.log = [...s.log, { id: ++seq, kind: 'stop', text: hit.line }].slice(-MAX_LINES)
+          publish()
+        }
+        return
+      }
+      s.refused = false
+
       // The session runs at the pace it is written at, whatever the clock is
       // doing: a transcript flying past at 300x would be unreadable.
       const step = TICK_MS
@@ -159,6 +207,7 @@ export function useSession({ workload, playing, promptText, adHocReply, reduced 
         const [kind, text, cost, delay] = line
         s.log = [...s.log, { id: ++seq, kind, text }].slice(-MAX_LINES)
         s.played = Math.round((s.played + cost) * 10) / 10
+        s.week = Math.round((s.week + cost) * 10) / 10
         s.lineAt += 1
         s.wait = delay
         publish()
@@ -175,5 +224,8 @@ export function useSession({ workload, playing, promptText, adHocReply, reduced 
     return () => clearInterval(id)
   }, [playing, reduced, begin, publish])
 
-  return useMemo(() => ({ ...view, send, reset }), [view, send, reset])
+  return useMemo(
+    () => ({ ...view, send, newWindow, newWeek }),
+    [view, send, newWindow, newWeek]
+  )
 }

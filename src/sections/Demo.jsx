@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useI18n } from '../i18n/index.jsx'
+import { fill, useI18n } from '../i18n/index.jsx'
 import { useReducedMotion } from '../hooks/useReducedMotion.js'
 import { useDemoHost } from '../demo/host.js'
 import { LOCALES, SUPPORTED_LANGUAGES, t as tr } from '../demo/locales.js'
-import { FIVE_HOUR_MS, adviceAt, statsAt, usageAt } from '../demo/simulate.js'
+import { FIVE_HOUR_MS, adviceAt, blockedBy, resetsAt, statsAt, usageAt } from '../demo/simulate.js'
 import { SESSIONS, WORKLOADS, turnCost } from '../demo/session.js'
 import { useSession } from '../demo/useSession.js'
 
@@ -112,18 +112,32 @@ export function Demo() {
   // are not translated: Claude Code prints those in English wherever it runs.
   const promptText = useCallback((id) => d.prompts[id] ?? id, [d])
 
+  // Which limit has run out, if either. Claude Code refuses to send once one has,
+  // so this is what stops the terminal, greys out the prompts, and says why.
+  const blockFor = useCallback(
+    (spent) => {
+      const kind = blockedBy(workload, spent)
+      if (!kind) return null
+      return {
+        kind,
+        line: kind === 'fiveHour' ? fill(d.limitFiveHour, { at: resetsAt() }) : d.limitWeekly,
+      }
+    },
+    [workload, d]
+  )
+
   const session = useSession({
     workload,
     playing,
     promptText,
     adHocReply: d.adHocReply,
     reduced,
+    blockFor,
   })
 
-  const usage = useMemo(
-    () => usageAt(workload, session.played, elapsed),
-    [workload, session.played, elapsed]
-  )
+  const spent = session.spent
+  const block = session.blocked
+  const usage = useMemo(() => usageAt(workload, spent, elapsed), [workload, spent, elapsed])
   const inset = os === 'mac' ? MENUBAR : 0
   const elapsedRef = useRef(elapsed)
   elapsedRef.current = elapsed
@@ -183,7 +197,9 @@ export function Demo() {
     const id = setInterval(() => {
       setElapsed((e) => {
         if (e + step < FIVE_HOUR_MS) return e + step
-        sessionRef.current.reset()
+        // A new 5-hour window, which clears this window's spend and the
+        // transcript — but not what the week has spent.
+        sessionRef.current.newWindow()
         return 0
       })
     }, tick)
@@ -194,7 +210,7 @@ export function Demo() {
   // notifications. Thresholds already passed are marked as seen so the only
   // toasts a visitor gets are the ones they watch happen.
   const primeThresholds = useCallback((nextWorkload) => {
-    const u = usageAt(nextWorkload, 0, elapsedRef.current)
+    const u = usageAt(nextWorkload, { window: 0, week: 0 }, elapsedRef.current)
     fired.current = {
       fiveHour: new Set(THRESHOLDS.filter((x) => u.fiveHourPct >= x)),
       weekly: new Set(THRESHOLDS.filter((x) => u.weeklyPct >= x)),
@@ -238,7 +254,9 @@ export function Demo() {
   }, [])
 
   const restart = useCallback(() => {
-    sessionRef.current.reset()
+    // A clean week as well as a clean window: this is the way out of a weekly
+    // limit, which nothing else in the demo can clear.
+    sessionRef.current.newWeek()
     setElapsed(FIVE_HOUR_MS * 0.38)
     primeThresholds(workload)
     setPlaying(true)
@@ -387,7 +405,7 @@ export function Demo() {
         structured: true,
         cached,
         advice: adviceAt(workload, winLangRef.current),
-        stats: statsAt(workload, session.played, elapsed),
+        stats: statsAt(workload, spent, elapsed),
       }
     },
     'calibrate-opacity-preview': (value) => setOpacity(value),
@@ -413,7 +431,7 @@ export function Demo() {
     (frame) => {
       host.emit(frame, 'locale-data', localePayload(winLang))
       if (frame === 'widget') {
-        host.emit('widget', 'usage-update', usageAt(workload, session.played, elapsed))
+        host.emit('widget', 'usage-update', usageAt(workload, spent, elapsed))
         host.emit('widget', 'clickthrough:state', clickThrough)
       }
       if (frame === 'calibrate') {
@@ -427,7 +445,7 @@ export function Demo() {
         })
       }
     },
-    [host, localePayload, winLang, workload, session.played, elapsed, clickThrough, opacity, prefs]
+    [host, localePayload, winLang, workload, spent, elapsed, clickThrough, opacity, prefs]
   )
 
   useEffect(() => {
@@ -480,6 +498,7 @@ export function Demo() {
             log={session.log}
             typed={session.typed}
             busy={session.busy}
+            block={block}
             draft={draft}
             setDraft={setDraft}
             onSend={sendPrompt}
@@ -534,6 +553,7 @@ export function Demo() {
 
       <Controls
         d={d}
+        block={block}
         os={os}
         setOs={setOs}
         workload={workload}
@@ -678,6 +698,7 @@ function Terminal({
   log,
   typed,
   busy,
+  block,
   onSend,
   draft,
   setDraft,
@@ -693,7 +714,7 @@ function Terminal({
   const submit = (e) => {
     e.preventDefault()
     const text = draft.trim()
-    if (!text) return
+    if (!text || block) return
     setDraft('')
     onSend(null, text)
   }
@@ -739,7 +760,7 @@ function Terminal({
           {/* One live line: the prompt being typed, or an empty one with a cursor
               while the session waits for you. Hidden while output is streaming,
               because the prompt is in the scrollback by then. */}
-          {(typed !== null || !busy) && (
+          {(typed !== null || (!busy && !block)) && (
             <span className="dterm-live dterm-in">
               {`> ${typed ?? ''}`}
               <span className="dterm-caret" />
@@ -749,13 +770,14 @@ function Terminal({
         </pre>
       </div>
 
-      <div className="dterm-ask">
+      <div className={`dterm-ask${block ? ' is-blocked' : ''}`}>
         <div className="dterm-chips">
           {SESSIONS[workload].turns.map((turn, i) => (
             <button
               key={turn.prompt}
               type="button"
               className="dterm-chip"
+              disabled={!!block}
               onClick={() => onSend(i)}
               title={d.prompts[turn.prompt]}
             >
@@ -772,9 +794,10 @@ function Terminal({
             className="dterm-input"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={busy ? d.inputQueue : d.inputPlaceholder}
+            placeholder={block ? d.inputBlocked : busy ? d.inputQueue : d.inputPlaceholder}
             aria-label={d.inputPlaceholder}
             maxLength={120}
+            disabled={!!block}
             spellCheck="false"
             autoComplete="off"
           />
@@ -799,6 +822,7 @@ function Weight({ cost, label }) {
 
 function Controls({
   d,
+  block,
   os,
   setOs,
   workload,
@@ -869,6 +893,7 @@ function Controls({
       <div className="dctl-row dctl-readout">
         <span className="dctl-clock val">{clock}</span>
         <span className="dctl-used val">{d.usedLabel.replace('{x}', Math.round(used))}</span>
+        {block ? <span className="dctl-blocked">{d.blockedLabel[block.kind]}</span> : null}
       </div>
 
       <p className="dctl-hint">{d.hint}</p>
