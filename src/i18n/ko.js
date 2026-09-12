@@ -100,7 +100,6 @@ export default {
     relaunch: '위젯 다시 실행',
     note: '창 안쪽은 실제 앱 화면 그대로예요(같은 코드를 그대로 불러왔어요). 수치는 세 가지 사용 흐름으로 재현한 예시이고, 실제 앱은 Claude Code가 남기는 실측 한도 값을 읽어요. 조언 문장도 데모에서는 미리 써둔 것이지만, 실제 앱은 같은 자리에 AI가 그때그때 쓴 문장을 넣어요.',
     terminal: [
-      ['dim', '~/projects/api  claude'],
       ['in', '> 결제 모듈 리팩터링하고 테스트까지 돌려줘'],
       ['dim', ''],
       ['run', '● Read  src/billing/charge.ts (412 lines)'],

@@ -94,6 +94,12 @@ export function Demo() {
   const elapsedRef = useRef(elapsed)
   elapsedRef.current = elapsed
 
+  // A window asks for advice from inside the very call that tells it the language
+  // changed, which is before React has re-rendered this component — so the answer
+  // has to come from somewhere that is already current. See setLanguage().
+  const winLangRef = useRef(winLang)
+  winLangRef.current = winLang
+
   // ---- the demo only exists once it is nearly on screen -------------------
   // Three iframes and the app's scripts have no business loading with the hero.
   // It also guarantees the host object is installed before any bridge looks for it.
@@ -265,6 +271,10 @@ export function Demo() {
 
   const setLanguage = useCallback(
     (code) => {
+      // Ahead of the emit on purpose: detail.js responds to locale-data by asking
+      // for fresh advice straight away, and that request must not be answered in
+      // the language we are leaving.
+      winLangRef.current = code
       setWinLang(code)
       adviceSeen.current = false
       for (const frame of ['widget', 'detail', 'calibrate']) {
@@ -308,7 +318,7 @@ export function Demo() {
       return {
         structured: true,
         cached,
-        advice: adviceAt(scenario, winLang),
+        advice: adviceAt(scenario, winLangRef.current),
         stats: statsAt(scenario, elapsed),
       }
     },
@@ -394,7 +404,7 @@ export function Demo() {
             <MacMenuBar clock={hhmm(usage.updatedAt)} lang={winLang} />
           ) : null}
 
-          <FakeTerminal lines={d.terminal} inset={inset} />
+          <FakeTerminal lines={d.terminal} inset={inset} os={os} />
 
           {armed &&
             frames.map(({ frame, src, title }) =>
@@ -568,15 +578,39 @@ function MacMenuBar({ clock, lang }) {
 
 // Something for the widget to sit on top of, so "always on top, out of the way"
 // is visible rather than asserted. Decorative: no controls, not in the a11y tree.
-function FakeTerminal({ lines, inset }) {
+// The shell prompt is the one line of the session that differs between the two
+// systems, so it is drawn here rather than translated.
+const PROMPT = {
+  win: 'C:\\projects\\api> claude',
+  mac: '~/projects/api % claude',
+}
+
+function FakeTerminal({ lines, inset, os }) {
   return (
     <div className="dterm" style={{ top: 70 + inset }} aria-hidden="true">
       <div className="dterm-bar">
-        <span />
-        <span />
-        <span />
+        {os === 'mac' ? (
+          <span className="dterm-lights">
+            <span />
+            <span />
+            <span />
+          </span>
+        ) : (
+          <>
+            <span className="dterm-name">claude</span>
+            <span className="dterm-wbtns">
+              <span>&#x2500;</span>
+              <span>&#x2610;</span>
+              <span>&#x2715;</span>
+            </span>
+          </>
+        )}
       </div>
       <pre>
+        <span className="dterm-dim">
+          {PROMPT[os]}
+          {'\n'}
+        </span>
         {lines.map((l, i) => (
           <span className={`dterm-${l[0]}`} key={i}>
             {l[1]}

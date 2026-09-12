@@ -100,7 +100,6 @@ export default {
     relaunch: 'Relaunch widget',
     note: 'Inside the window frames is the real application, loaded from the same code that ships. The numbers come from three hand-drawn usage patterns; the installed app reads the actual limit values Claude Code reports. The advice is written out ahead of time here — in the installed app a language model writes it on the spot, in the same place.',
     terminal: [
-      ['dim', '~/projects/api  claude'],
       ['in', '> refactor the billing module and run the tests'],
       ['dim', ''],
       ['run', '● Read  src/billing/charge.ts (412 lines)'],
