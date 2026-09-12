@@ -497,6 +497,7 @@ export function Demo() {
             workload={workload}
             log={session.log}
             typed={session.typed}
+            working={playing ? session.working : null}
             busy={session.busy}
             block={block}
             draft={draft}
@@ -697,6 +698,7 @@ function Terminal({
   workload,
   log,
   typed,
+  working,
   busy,
   block,
   onSend,
@@ -754,6 +756,9 @@ function Terminal({
           {log.map((l) => (
             <span className={`dterm-${l.kind}`} key={l.id}>
               {l.text}
+              {/* The step being worked on right now. Without it a three-second
+                  Edit and a frozen terminal look exactly the same. */}
+              {l.id === working ? <span className="dterm-work" aria-hidden="true" /> : null}
               {'\n'}
             </span>
           ))}

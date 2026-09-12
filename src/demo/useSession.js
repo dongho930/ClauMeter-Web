@@ -10,12 +10,12 @@ import { SESSIONS, adHocTurn } from './session.js'
 // renders a second rather than one per tick.
 
 const TICK_MS = 50
-const TYPE_MS = 30 // per character
-const THINK_MS = 450 // between the prompt landing and the first tool line
-// How long the session rests before asking for the next thing. Long enough that
-// the bars visibly settle between turns: at 4.2s the widget never stopped moving,
-// which is what made the climb feel like a slot machine rather than an afternoon.
-const BETWEEN_TURNS_MS = 11_000
+const TYPE_MS = 45 // per character — brisk, but a prompt should be readable as it lands
+const THINK_MS = 900 // the pause before the first tool call, while the model reads the ask
+// How long the session rests before asking for the next thing. Down from 11s now
+// that the turns themselves carry real duration — the rest is there so the bars
+// visibly settle, not to pad out a script that was over in six seconds.
+const BETWEEN_TURNS_MS = 8000
 const MAX_LINES = 60 // the transcript is a window, not a log file
 
 // A blank machine. `carry` is what the week has spent so far: a fresh 5-hour
@@ -54,6 +54,7 @@ export function useSession({ workload, playing, promptText, adHocReply, reduced,
   // visible costs no render.
   const [view, setView] = useState(() => ({
     log: [],
+    working: null,
     typed: null,
     spent: { window: 0, week: 0 },
     blocked: null,
@@ -64,8 +65,14 @@ export function useSession({ workload, playing, promptText, adHocReply, reduced,
   const publish = useCallback(() => {
     const s = m.current
     const spent = { window: s.played, week: s.week }
+    // Which line is being worked on right now: the last one printed, while its
+    // hold is still running and it is a tool call rather than a result. Without
+    // this a three-second Edit is indistinguishable from a frozen terminal.
+    const last = s.log[s.log.length - 1]
+    const working = s.turn && s.wait > 0 && last && last.kind === 'run' ? last.id : null
     setView({
       log: s.log,
+      working,
       // Non-null only while a prompt is actually being typed.
       typed: s.turn && s.typed !== null ? s.typed : null,
       spent,

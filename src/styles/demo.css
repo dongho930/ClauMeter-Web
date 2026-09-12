@@ -300,6 +300,41 @@ button.db-close:hover {
   color: #5d6b78;
 }
 
+/* Trails the tool line that is currently running: a space and then dots that
+   fill in, on the caret's own cadence so the terminal has one pulse rather than
+   two. Reduced motion parks them at full width, where they still mark the line
+   without moving. */
+.dterm-work {
+  display: inline-block;
+  width: 4ch;
+  overflow: hidden;
+  vertical-align: bottom;
+  white-space: pre;
+  color: #5d6b78;
+  animation: dwork 1.05s infinite;
+}
+
+.dterm-work::before {
+  content: ' ...';
+}
+
+/* One dot is always showing: a frame with none in it is a line that looks
+   finished rather than busy. */
+@keyframes dwork {
+  0%,
+  32% {
+    width: 2ch;
+  }
+  33%,
+  65% {
+    width: 3ch;
+  }
+  66%,
+  100% {
+    width: 4ch;
+  }
+}
+
 /* The line that says a limit has run out. The app's own redline colour, because
    it is the same event the widget's bar is reporting. */
 .dterm-stop {
