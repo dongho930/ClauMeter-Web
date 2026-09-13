@@ -11,10 +11,14 @@
 // in advance; the costs are plausible numbers, not measured ones.
 //
 // One hard constraint: each workload's total must stay at the figure the pace
-// advice quotes (46 / 86 / 98, weekly 34 / 61 / 93), because that advice is
+// advice quotes (46 / 86 / 106, weekly 34 / 61 / 93), because that advice is
 // written out in twelve languages and none of it should have to change when this
 // script does. `node scripts/check-session.mjs` says so out loud if a total
 // drifts.
+//
+// The danger total is over 100 on purpose: that workload is the one that runs
+// out, and a window only reads as running out if its projection passes the limit.
+// See PROJECTED in simulate.js.
 //
 // Costs decide how fast the bars climb:
 //   - a whole prompt costs about seven points, so no single ask swallows a
@@ -144,11 +148,13 @@ export const SESSIONS = {
     ],
   },
 
-  // A marathon that walks the window up to its edge. The visitor arrives with it
-  // already amber and the week nearly spent.
+  // A marathon that walks the window past its edge. The visitor arrives with it
+  // already amber and the week nearly spent, and playing the script to the end
+  // takes the 5-hour limit to 100% — which is the point: this is the only
+  // workload where the terminal actually stops (see blockedBy).
   danger: {
     risk: 'danger',
-    base: 77,
+    base: 85,
     weeklyEnd: 93,
     turns: [
       {

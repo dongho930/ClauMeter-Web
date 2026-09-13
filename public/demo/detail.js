@@ -14,8 +14,16 @@ const riskBadge = document.getElementById('riskBadge');
 const summaryText = document.getElementById('summaryText');
 const fiveHourAdvice = document.getElementById('fiveHourAdvice');
 const weeklyAdvice = document.getElementById('weeklyAdvice');
-const fiveHourSafePct = document.getElementById('fiveHourSafePct');
-const weeklySafePct = document.getElementById('weeklySafePct');
+const fiveHourHeadline = document.getElementById('fiveHourHeadline');
+const weeklyHeadline = document.getElementById('weeklyHeadline');
+const fiveHourSub = document.getElementById('fiveHourSub');
+const weeklySub = document.getElementById('weeklySub');
+const fiveHourLink = document.getElementById('fiveHourLink');
+const weeklyLink = document.getElementById('weeklyLink');
+const fiveHourAdviceCard = document.getElementById('fiveHourAdviceCard');
+const weeklyAdviceCard = document.getElementById('weeklyAdviceCard');
+const fiveHourAdviceDot = document.getElementById('fiveHourAdviceDot');
+const weeklyAdviceDot = document.getElementById('weeklyAdviceDot');
 const refreshBtn = document.getElementById('refreshBtn');
 const detailHeadingEl = document.getElementById('detailHeading');
 const fiveHourCardTitleEl = document.getElementById('fiveHourCardTitle');
@@ -27,6 +35,12 @@ function riskColor(code) {
   if (code === 'danger') return '#e53935';
   if (code === 'caution') return '#ffb300';
   return '#43a047';
+}
+
+// 한도 카드의 상태색(점 + 왼쪽 바). 실측값이 없어 상태를 모를 때는 중립 회색으로 둔다 -
+// 초록(안전)으로 칠하면 "확인해보니 괜찮다"는 잘못된 신호가 된다.
+function riskAccent(code) {
+  return code ? riskColor(code) : '#4a4e55';
 }
 
 function riskLabel(code) {
@@ -44,6 +58,77 @@ function showAdviceBox(text, isError) {
   adviceBox.textContent = text;
 }
 
+// 조언 카드의 헤드라인 한 줄과 그 아래 보조 한 줄. 숫자는 전부 main.js가 계산한 값을 그대로 쓰고,
+// Groq은 "그래서 뭘 하라"는 문장만 담당한다.
+//
+// 세 가지 경우뿐이다.
+//   1. 예상 마감이 100% 초과  -> "이 속도면 {t} 뒤 한도 도달" + 초기화까지 남은 시간 + 줄여야 할 속도
+//   2. 예상 마감이 100% 이하  -> "이 속도면 구간 끝까지 여유 있습니다" + 예상 마감 사용률
+//   3. 구간 초반(데드존)이라 예측 자체가 없음 -> "아직 판단할 수 없습니다"
+// 실측값 자체가 없으면(터미널 세션 없음) 예측이 없는 이유가 데드존이 아니므로 따로 구분한다.
+function renderAdviceHeadline(headlineEl, subEl, hasData, projectedPct, timeToLimit, atLimitNow, slowdownPct, remaining) {
+  headlineEl.classList.remove('hits-limit', 'unknown');
+
+  if (!hasData) {
+    headlineEl.classList.add('unknown');
+    headlineEl.textContent = STR.noData;
+    subEl.textContent = '';
+    return;
+  }
+
+  if (projectedPct == null) {
+    headlineEl.classList.add('unknown');
+    headlineEl.textContent = STR.paceTooEarly;
+    subEl.textContent = `${STR.remainingLabel}${remaining}`;
+    return;
+  }
+
+  if (atLimitNow) {
+    headlineEl.classList.add('hits-limit');
+    headlineEl.textContent = STR.paceAtLimitNow;
+    subEl.textContent = `${STR.remainingLabel}${remaining}`;
+    return;
+  }
+
+  if (timeToLimit != null) {
+    headlineEl.classList.add('hits-limit');
+    headlineEl.textContent = fmt(STR.paceHitsLimitIn, { t: timeToLimit });
+    // 한도 도달 시각과 초기화 시각을 나란히 둬야 "초기화 전에 막힌다"가 뺄셈 없이 보인다.
+    subEl.textContent =
+      `${STR.remainingLabel}${remaining}` +
+      (slowdownPct != null ? ` · ${fmt(STR.paceSlowdown, { n: slowdownPct })}` : '');
+    return;
+  }
+
+  headlineEl.textContent = STR.paceFitsInWindow;
+  subEl.textContent = `${STR.projectedLabel}${projectedPct}% · ${STR.remainingLabel}${remaining}`;
+}
+
+// 두 한도를 잇는 줄. 같은 사용이 두 게이지를 동시에 깎으므로, 한쪽 게이지만 봐서는 판단이 어긋난다.
+//   5시간 카드: 이 구간을 끝까지 쓰면 주간이 어디까지 가는지 (게이지가 여유로워 보여도 다 쓰면 안 되는 경우)
+//   주간 카드: 남은 주간 여유가 5시간 구간 몇 번분인지 (%p보다 훨씬 직관적인 단위)
+// 환산 비율은 실측 이력에서 학습하므로 표본이 부족하면 값이 null이고, 그때는 줄을 비워서 숨긴다.
+function applyLimitAccent(cardEl, dotEl, risk) {
+  const color = riskAccent(risk);
+  cardEl.style.borderLeftColor = color;
+  dotEl.style.background = color;
+}
+
+function renderLinkLines(stats) {
+  fiveHourLink.textContent =
+    stats.weeklyIfFiveHourFull != null ? fmt(STR.ifFiveHourFull, { x: stats.weeklyIfFiveHourFull }) : '';
+
+  if (stats.weeklyWindowsLeft == null) {
+    weeklyLink.textContent = '';
+    return;
+  }
+  const windows = fmt(STR.weeklyInWindows, { h: stats.weeklyHeadroomPct, n: stats.weeklyWindowsLeft });
+  weeklyLink.textContent =
+    stats.weeklyWindowsPerDay != null
+      ? `${windows} (${fmt(STR.weeklyPerDay, { r: stats.weeklyWindowsPerDay })})`
+      : windows;
+}
+
 function showAdviceCards(advice, stats) {
   adviceBox.style.display = 'none';
   adviceBox.classList.remove('error');
@@ -54,11 +139,21 @@ function showAdviceCards(advice, stats) {
   summaryText.textContent = advice.summary || '';
   fiveHourAdvice.textContent = advice.fiveHour || '';
   weeklyAdvice.textContent = advice.weekly || '';
-  // 숫자는 개인화 모델(main.js)이 계산한 값을 그대로 쓰고, Groq은 설명만 담당한다.
-  fiveHourSafePct.textContent =
-    stats && stats.fiveHourSafePct != null ? fmt(STR.recommendedUpTo, { x: stats.fiveHourSafePct }) : '';
-  weeklySafePct.textContent =
-    stats && stats.weeklySafePct != null ? fmt(STR.recommendedUpTo, { x: stats.weeklySafePct }) : '';
+  if (!stats) return;
+  // 같은 한도의 통계 카드와 조언 카드가 같은 상태색을 갖도록 맞춘다.
+  applyLimitAccent(fiveHourAdviceCard, fiveHourAdviceDot, stats.fiveHourRisk);
+  applyLimitAccent(weeklyAdviceCard, weeklyAdviceDot, stats.weeklyRisk);
+  renderLinkLines(stats);
+  renderAdviceHeadline(
+    fiveHourHeadline, fiveHourSub,
+    stats.fiveHourHasData, stats.fiveHourProjectedPct, stats.fiveHourTimeToLimit,
+    stats.fiveHourAtLimitNow, stats.fiveHourSlowdownPct, stats.fiveHourRemaining
+  );
+  renderAdviceHeadline(
+    weeklyHeadline, weeklySub,
+    stats.weeklyHasData, stats.weeklyProjectedPct, stats.weeklyTimeToLimit,
+    stats.weeklyAtLimitNow, stats.weeklySlowdownPct, stats.weeklyRemaining
+  );
 }
 
 function renderStats(stats) {
@@ -80,16 +175,22 @@ function renderStats(stats) {
     ? `${STR.usageRateLabel}<b>${stats.weeklyPct}%</b> <span class="model-tag">${STR.realValueTag}</span>`
     : `${STR.usageRateLabel}<b>${STR.noData}</b> <span class="model-tag">${STR.needsTerminalTag}</span>`;
   statsEl.innerHTML = `
-    <div class="stat-card">
-      <div class="stat-title">${STR.fiveHourLimit}</div>
+    <div class="stat-card limit-card" style="border-left-color:${riskAccent(stats.fiveHourRisk)}">
+      <div class="limit-title">
+        <span class="limit-dot" style="background:${riskAccent(stats.fiveHourRisk)}"></span>
+        <span>${STR.fiveHourLimit}</span>
+      </div>
       <div class="stat-row">${fiveHourUsageRow}</div>
       <div class="stat-row">${STR.elapsedLabel}${stats.fiveHourElapsed}</div>
       <div class="stat-row">${STR.remainingLabel}${stats.fiveHourRemaining}</div>
       <div class="stat-row">${STR.projectedLabel}<b>${stats.fiveHourProjectedPct != null ? stats.fiveHourProjectedPct + '%' : '-'}</b> ${fiveHourTag}</div>
       ${fiveHourAccLine}
     </div>
-    <div class="stat-card">
-      <div class="stat-title">${STR.weeklyLimit}</div>
+    <div class="stat-card limit-card" style="border-left-color:${riskAccent(stats.weeklyRisk)}">
+      <div class="limit-title">
+        <span class="limit-dot" style="background:${riskAccent(stats.weeklyRisk)}"></span>
+        <span>${STR.weeklyLimit}</span>
+      </div>
       <div class="stat-row">${weeklyUsageRow}</div>
       <div class="stat-row">${STR.elapsedLabel}${stats.weeklyElapsed}</div>
       <div class="stat-row">${STR.remainingLabel}${stats.weeklyRemaining}</div>

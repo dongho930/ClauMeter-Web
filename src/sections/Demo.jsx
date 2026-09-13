@@ -405,7 +405,9 @@ export function Demo() {
         structured: true,
         cached,
         advice: adviceAt(workload, winLangRef.current),
-        stats: statsAt(workload, spent, elapsed),
+        // The durations in the stats are localized by the main process in the
+        // app, so they need the window's language here too — not the site's.
+        stats: statsAt(workload, spent, elapsed, winLangRef.current),
       }
     },
     'calibrate-opacity-preview': (value) => setOpacity(value),
