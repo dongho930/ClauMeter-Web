@@ -116,6 +116,11 @@ export default {
 
     workloadLabel: 'Workload',
     workloads: { calm: 'Light edits', caution: 'Module refactor', danger: 'Project-wide rename' },
+    workloadNotes: {
+      calm: 'Safe on both limits — behind the pace line and closing well under the limit. No notifications.',
+      caution: 'Caution on both limits — ahead of the pace line, but closing inside the limit. Notifies at 75%.',
+      danger: 'Danger on both limits — each on course to run out before it resets. Notifies at 90%, then the 5-hour limit stops the session.',
+    },
     osLabel: 'Desktop',
     os: { win: 'Windows', mac: 'macOS' },
     speedLabel: 'Clock',

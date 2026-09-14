@@ -3,7 +3,7 @@ import { fill, useI18n } from '../i18n/index.jsx'
 import { useReducedMotion } from '../hooks/useReducedMotion.js'
 import { useDemoHost } from '../demo/host.js'
 import { LOCALES, SUPPORTED_LANGUAGES, t as tr } from '../demo/locales.js'
-import { FIVE_HOUR_MS, adviceAt, blockedBy, resetsAt, statsAt, usageAt } from '../demo/simulate.js'
+import { adviceAt, arrivalAt, blockedBy, resetsAt, sceneEndAt, statsAt, usageAt } from '../demo/simulate.js'
 import { SESSIONS, WORKLOADS, turnCost } from '../demo/session.js'
 import { useSession } from '../demo/useSession.js'
 
@@ -84,7 +84,7 @@ export function Demo() {
   const [workload, setWorkload] = useState('caution')
   const [playing, setPlaying] = useState(!reduced)
   const [speed, setSpeed] = useState(DEFAULT_SPEED)
-  const [elapsed, setElapsed] = useState(() => FIVE_HOUR_MS * 0.38)
+  const [elapsed, setElapsed] = useState(() => arrivalAt('caution'))
   const [draft, setDraft] = useState('')
   const [winLang, setWinLang] = useState(siteLang)
   const [opacity, setOpacity] = useState(1)
@@ -182,13 +182,26 @@ export function Demo() {
   }, [])
 
   // ---- the clock -----------------------------------------------------------
-  // All this moves now is the countdowns and the "as of" time. When the window
-  // runs out it resets, and the session in the terminal starts over with it —
-  // which is the one moment a visitor gets to watch the bars drop to zero.
+  // All this moves is the countdowns, the pace line and the "as of" time. Each
+  // workload plays one stretch of the window — the stretch where its state holds
+  // (see ARRIVAL in simulate.js) — and starts over when the clock leaves it.
   // session is a fresh object on every publish, so it is reached through a ref:
   // depending on it here rebuilt the interval several times a second.
   const sessionRef = useRef(session)
   sessionRef.current = session
+  const workloadRef = useRef(workload)
+  workloadRef.current = workload
+
+  // A window that has just started over, or a different usage pattern, is a fresh
+  // set of notifications. Thresholds already passed are marked as seen so the only
+  // toasts a visitor gets are the ones they watch happen.
+  const primeThresholds = useCallback((nextWorkload, at = elapsedRef.current) => {
+    const u = usageAt(nextWorkload, { window: 0, week: 0 }, at)
+    fired.current = {
+      fiveHour: new Set(THRESHOLDS.filter((x) => u.fiveHourPct >= x)),
+      weekly: new Set(THRESHOLDS.filter((x) => u.weeklyPct >= x)),
+    }
+  }, [])
 
   useEffect(() => {
     if (!playing || !armed) return
@@ -196,30 +209,29 @@ export function Demo() {
     const step = tick * speed
     const id = setInterval(() => {
       setElapsed((e) => {
-        if (e + step < FIVE_HOUR_MS) return e + step
-        // A new 5-hour window, which clears this window's spend and the
-        // transcript — but not what the week has spent.
-        sessionRef.current.newWindow()
-        return 0
+        const w = workloadRef.current
+        if (e + step < sceneEndAt(w)) return e + step
+        // The scene starts over: a clean week and window, and the clock back where
+        // this workload opens. Rolling into a fresh window instead would open it
+        // with no projection, and danger would read amber for its first quarter.
+        sessionRef.current.newWeek()
+        primeThresholds(w, arrivalAt(w))
+        return arrivalAt(w)
       })
     }, tick)
     return () => clearInterval(id)
-  }, [playing, armed, speed])
+  }, [playing, armed, speed, primeThresholds])
 
-  // A window that has just reset, or a different usage pattern, is a fresh set of
-  // notifications. Thresholds already passed are marked as seen so the only
-  // toasts a visitor gets are the ones they watch happen.
-  const primeThresholds = useCallback((nextWorkload) => {
-    const u = usageAt(nextWorkload, { window: 0, week: 0 }, elapsedRef.current)
-    fired.current = {
-      fiveHour: new Set(THRESHOLDS.filter((x) => u.fiveHourPct >= x)),
-      weekly: new Set(THRESHOLDS.filter((x) => u.weeklyPct >= x)),
-    }
-  }, [])
-
-  // A new workload, or a window that just reset, is a fresh set of notifications.
+  // A different workload opens at its own point in the window, with its own
+  // notifications. Skipped on mount, where the clock already starts there.
+  const firstWorkload = useRef(true)
   useEffect(() => {
-    primeThresholds(workload)
+    if (firstWorkload.current) {
+      firstWorkload.current = false
+    } else {
+      setElapsed(arrivalAt(workload))
+    }
+    primeThresholds(workload, arrivalAt(workload))
   }, [workload, primeThresholds])
 
   const pushToast = useCallback((body) => {
@@ -257,8 +269,8 @@ export function Demo() {
     // A clean week as well as a clean window: this is the way out of a weekly
     // limit, which nothing else in the demo can clear.
     sessionRef.current.newWeek()
-    setElapsed(FIVE_HOUR_MS * 0.38)
-    primeThresholds(workload)
+    setElapsed(arrivalAt(workload))
+    primeThresholds(workload, arrivalAt(workload))
     setPlaying(true)
   }, [primeThresholds, workload])
 
@@ -851,6 +863,7 @@ function Controls({
             <button
               key={w}
               className={workload === w ? 'on' : ''}
+              data-risk={SESSIONS[w].risk}
               aria-pressed={workload === w}
               onClick={() => setWorkload(w)}
             >
@@ -859,6 +872,7 @@ function Controls({
           ))}
         </div>
       </div>
+      <p className="dctl-workload-note">{d.workloadNotes[workload]}</p>
 
       <div className="dctl-row">
         <button className="dctl-play" onClick={() => setPlaying((p) => !p)}>

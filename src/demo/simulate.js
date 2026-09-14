@@ -21,30 +21,63 @@ const WINDOW_START_HHMM = [9, 52]
 // resetting Saturday morning. Keeps "Resets in 4d 6h" on screen.
 const WEEK_ELAPSED_MS = 2 * 24 * 60 * 60 * 1000 + 18 * 60 * 60 * 1000
 
-// Where each workload lands once its script has played out, which is what the
-// app's model predicts the window will close at — so the detail window quotes it
-// directly, and so does the pace advice, in twelve languages. session.js is built
-// to add up to exactly these; scripts/check-session.mjs keeps them honest.
+// What the app's model predicts each limit will close at, per workload. The detail
+// window quotes these directly, and so does the pace advice, in twelve languages.
+//
+//   fiveHour   where this 5-hour window closes. session.js is built to add up to
+//              exactly this, because the window closes when the script does.
+//   weekly     where the *week* closes, at Saturday's reset — four days after the
+//              session on screen, so it is not where the weekly bar stops. It is
+//              the reading plus the rest of the week at the pace the week has run.
+//   weeklyNow  where the weekly bar stops once the script has played out, which
+//              the danger advice quotes by number ("the week is at 93%").
+//
+// scripts/check-session.mjs keeps fiveHour and weeklyNow honest.
+//
+// Each workload holds one state on both limits for as long as it plays — that is
+// what makes the three worth picking between (see ARRIVAL below):
+//   calm      safe on both: under the pace line, closing well inside the limit
+//   caution   caution on both: ahead of the pace line, closing inside the limit
+//   danger    danger on both: on course to run out before the reset
+//
+// Over 100 on purpose for danger. Everything the app says about a limit that runs
+// out — "the limit is reached in 2h 13m", the slowdown it would take to avoid that,
+// the red state — hangs off a projection above the limit.
+//
+// The danger week used to be capped at 93, on the reasoning that one session only
+// moves it ~2pp. But the projection is to the end of the week, not the end of the
+// session: 91% spent by Tuesday evening, with four days to go, closing at 93 would
+// mean nobody touches Claude Code again until Saturday. It left the weekly light
+// amber in the one workload built to show red.
 const PROJECTED = {
-  calm: { fiveHour: 46, weekly: 34 },
-  caution: { fiveHour: 86, weekly: 61 },
-  // Over 100 on purpose. Everything the app says about a window that runs out —
-  // "the limit is reached in 2h 13m", the slowdown it would take to avoid that,
-  // the red state on both windows — hangs off a projection above the limit, so a
-  // danger scenario capped under it would have said "you stay within the limit"
-  // underneath its own "on course to run out" summary. (It did: the cap was there
-  // to keep an old headroom line, "up to +{x}% more", from going negative, and it
-  // outlived that line.)
-  //
-  // The weekly figure stays under 100 because it cannot honestly go over: the week
-  // climbs a tenth of a point per point of 5-hour usage, so one session moves it
-  // ~2pp, and a weekly projection above the limit would need a start above it too.
-  // The two limits reading differently is the truer picture anyway — the window
-  // runs out today, the week is merely tight.
-  danger: { fiveHour: 106, weekly: 93 },
+  calm: { fiveHour: 46, weekly: 72, weeklyNow: 34 },
+  caution: { fiveHour: 86, weekly: 91, weeklyNow: 61 },
+  danger: { fiveHour: 106, weekly: 114, weeklyNow: 93 },
 }
 
 export const PROJECTED_FOR_TEST = PROJECTED
+
+// How far into the 5-hour window each workload opens, and how far it plays before
+// the scene starts over. The pace line sweeps the whole window, so a fixed reading
+// changes state on its own as the clock passes it: calm used to open amber (24%
+// used, 5% into the window) and caution turned green once the clock overtook its
+// 86%. Each workload therefore plays only the stretch of the window where its
+// state is true:
+//
+//   calm      opens at 55%, past anything it will ever read (46% at most)
+//   caution   opens at 25%, well under its 60% start, and starts over at 60% —
+//             before the pace line can catch it even at 300x, where the clock
+//             outruns the script (scripts/check-session.mjs replays it to check)
+//   danger    opens at 38%; its projection is over 100 throughout
+//
+// Starting over rather than rolling into a fresh window is also what keeps danger
+// red: a fresh window has no projection for its first quarter, so it read amber
+// for the first stretch of every lap.
+const ARRIVAL = { calm: 0.55, caution: 0.25, danger: 0.38 }
+const SCENE_END = { calm: 1, caution: 0.6, danger: 1 }
+
+export const arrivalAt = (workload) => FIVE_HOUR_MS * (ARRIVAL[workload] ?? ARRIVAL.calm)
+export const sceneEndAt = (workload) => FIVE_HOUR_MS * (SCENE_END[workload] ?? SCENE_END.calm)
 
 // Verification numbers from the app's own accuracy log (model error vs. the naive
 // estimate over recent completed windows), kept at the values the site's
@@ -55,8 +88,8 @@ const ACCURACY = {
 }
 
 // The app only shows a projection once enough of the window has gone by for one
-// to mean anything (usageModel.isProjectionReliable).
-const PROJECTION_FROM = 0.15
+// to mean anything — usageModel.js's PROJECTION_DEADZONE_FRAC, the same quarter.
+const PROJECTION_FROM = 0.25
 
 // The wall clock the fake window started on, as a real timestamp — the widget
 // renders it with new Date(), so it has to be one.
@@ -259,22 +292,22 @@ const ADVICE = {
         'You are running a little under where this window usually is by now. At this pace you finish around 46% — plenty of room left.',
       fiveHour:
         'Nothing to manage here. Even a heavy last hour lands well under the limit, so work the way you were going to work.',
-      weekly: 'The week is barely touched. Nothing here needs attention before Saturday.',
+      weekly: 'The week is behind its pace line too. Keep going like this and it closes around 72% on Saturday — nothing here needs attention.',
     },
     caution: {
       summary:
         'You are running about 12% ahead of where this window usually is by now. Keep the current pace and you land near 86% — under the limit, but without much room to spare.',
       fiveHour:
         'Roughly 38 more minutes of this intensity is comfortable. After that, either slow down or wait for the reset at 14:52.',
-      weekly: 'The week is on track. Two more sessions like this one would be the point to start watching it.',
+      weekly: 'The week is ahead of its pace line as well, heading for about 91% by Saturday. Still inside the limit, but a couple more heavy days would use up the rest.',
     },
     danger: {
       summary:
-        'This window runs out before it resets. At the current pace it projects to 106%, so the limit lands before the 14:52 reset, and the week is right behind it at 93%.',
+        'Both limits are on course to run out. This window projects to 106%, so the limit lands before the 14:52 reset, and the week, already at 93%, projects to 114% and runs out before Saturday.',
       fiveHour:
         'Stop adding long sessions now. Short, targeted prompts until the 14:52 reset; slow down any less than that and the last stretch is locked out entirely.',
       weekly:
-        'The week still has room, but less than one full 5-hour window of it. That is nearly everything you have left before Saturday, so hold back whatever can wait.',
+        'The week runs out before Saturday too: 93% used, heading for 114%. Slowing down today will not fix it on its own, so spread what is left across the coming days and push anything that can wait to next week.',
     },
   },
   ko: {
@@ -283,22 +316,22 @@ const ADVICE = {
         '지금 이 구간의 평소 흐름보다 약간 여유 있게 쓰고 있어요. 이 페이스면 46% 정도로 마감돼서 여유가 많이 남아요.',
       fiveHour:
         '따로 관리할 게 없어요. 마지막 한 시간을 몰아서 써도 한도 아래로 끝나니까, 원래 하려던 대로 하면 돼요.',
-      weekly: '이번 주는 아직 거의 안 썼어요. 토요일 초기화 전까지 신경 쓸 일이 없어요.',
+      weekly: '이번 주도 기준선보다 느리게 쓰고 있어요. 이대로면 토요일에 72% 정도로 마감돼서 신경 쓸 일이 없어요.',
     },
     caution: {
       summary:
         '지금 이 구간의 평소 흐름보다 12% 정도 앞서 있어요. 이 페이스를 유지하면 86% 근처에서 마감돼요. 한도 안이지만 여유가 많지는 않아요.',
       fiveHour:
         '이 강도로는 38분쯤 더가 적당해요. 그 다음부터는 속도를 줄이거나 14:52 초기화를 기다리는 게 좋아요.',
-      weekly: '주간 한도는 아직 괜찮아요. 이런 작업을 두 번 더 하면 그때부터 지켜볼 시점이에요.',
+      weekly: '이번 주도 기준선보다 빨라서, 토요일에 91% 정도로 마감될 흐름이에요. 아직 한도 안이지만, 무거운 날이 이틀만 더 있으면 남은 여유를 다 써요.',
     },
     danger: {
       summary:
-        '이 구간은 초기화 전에 한도가 바닥나요. 지금 페이스면 예상 마감이 106%라, 14:52 초기화보다 한도에 먼저 닿아요. 주간 한도도 93%로 바로 뒤에 붙어 있어요.',
+        '두 한도 모두 바닥나는 흐름이에요. 이 구간은 예상 마감이 106%라 14:52 초기화보다 한도에 먼저 닿고, 이미 93%인 주간 한도도 예상 마감이 114%라 토요일 전에 바닥나요.',
       fiveHour:
         '긴 작업을 더 넣는 건 지금 멈추는 게 좋아요. 14:52 초기화까지는 짧고 목적이 분명한 요청만 남기세요. 그만큼 속도를 줄이지 않으면 마지막 구간은 통째로 막혀요.',
       weekly:
-        '주간 한도는 아직 남아 있지만, 남은 여유가 5시간 구간 한 번분도 안 돼요. 토요일까지 쓸 수 있는 게 사실상 그게 전부니, 미룰 수 있는 일은 미뤄두세요.',
+        '주간 한도도 토요일 전에 바닥나요. 지금 93%를 썼고 예상 마감은 114%예요. 오늘 속도만 줄여서는 해결되지 않으니, 남은 작업을 며칠에 나눠 쓰고 미룰 수 있는 일은 다음 주로 넘기세요.',
     },
   },
   es: {
@@ -307,22 +340,22 @@ const ADVICE = {
         'Vas un poco por debajo de donde suele estar esta ventana a estas alturas. A este ritmo terminas cerca del 46%: te queda mucho margen.',
       fiveHour:
         'No hay nada que gestionar. Incluso una última hora intensa acaba muy por debajo del límite, así que trabaja como tenías previsto.',
-      weekly: 'La semana está casi intacta. Aquí no hay nada que requiera atención antes del sábado.',
+      weekly: 'La semana también va por debajo de su línea de ritmo. Si sigues así, cierra cerca del 72% el sábado: nada que vigilar.',
     },
     caution: {
       summary:
         'Vas alrededor de un 12% por delante de donde suele estar esta ventana a estas alturas. Si mantienes el ritmo, acabarás cerca del 86%: por debajo del límite, pero sin mucho margen.',
       fiveHour:
         'Unos 38 minutos más a esta intensidad son llevaderos. Después, baja el ritmo o espera al reinicio de las 14:52.',
-      weekly: 'La semana va bien. Dos sesiones más como esta serían el momento de empezar a vigilarla.',
+      weekly: 'La semana también va por delante de su línea de ritmo y apunta a cerca del 91% el sábado. Sigue dentro del límite, pero un par de días intensos más agotarían el resto.',
     },
     danger: {
       summary:
-        'Esta ventana se agota antes de reiniciarse. Al ritmo actual la proyección es del 106%, así que alcanzarás el límite antes del reinicio de las 14:52, y la semana viene justo detrás con un 93%.',
+        'Los dos límites van camino de agotarse. Esta ventana proyecta un 106%, así que alcanzarás el límite antes del reinicio de las 14:52, y la semana, ya en el 93%, proyecta un 114%: se agota antes del sábado.',
       fiveHour:
         'Deja de añadir sesiones largas ahora. Solo peticiones cortas y concretas hasta el reinicio de las 14:52: si no bajas el ritmo al menos eso, el último tramo queda bloqueado por completo.',
       weekly:
-        'A la semana aún le queda margen, pero menos de una ventana de 5 horas completa. Es casi todo lo que te queda hasta el sábado, así que deja para entonces lo que pueda esperar.',
+        'La semana también se agota antes del sábado: 93% usado y rumbo al 114%. Bajar el ritmo solo hoy no basta, así que reparte lo que queda entre los próximos días y deja para la semana que viene lo que pueda esperar.',
     },
   },
   fr: {
@@ -331,22 +364,22 @@ const ADVICE = {
         "Vous êtes un peu en dessous de ce que cette fenêtre atteint d'habitude à ce stade. À ce rythme, vous terminez autour de 46 % : il reste beaucoup de marge.",
       fiveHour:
         "Rien à gérer ici. Même une dernière heure chargée finit bien en dessous du plafond : travaillez comme vous l'aviez prévu.",
-      weekly: "La semaine est à peine entamée. Rien ici ne demande votre attention avant samedi.",
+      weekly: "La semaine est elle aussi sous sa ligne de rythme. À ce train, elle se termine vers 72 % samedi : rien à surveiller.",
     },
     caution: {
       summary:
         "Vous êtes environ 12 % au-dessus de ce que cette fenêtre atteint d'habitude à ce stade. En gardant ce rythme, vous finirez près de 86 % : sous le plafond, mais sans grande marge.",
       fiveHour:
         "Encore 38 minutes à cette intensité, c'est confortable. Ensuite, ralentissez ou attendez la réinitialisation de 14:52.",
-      weekly: "La semaine est bien partie. Deux sessions de plus comme celle-ci, et il faudra commencer à la surveiller.",
+      weekly: "La semaine est elle aussi en avance sur sa ligne de rythme et se dirige vers 91 % samedi. Toujours sous le plafond, mais deux journées chargées de plus consommeraient le reste.",
     },
     danger: {
       summary:
-        "Cette fenêtre sera épuisée avant sa réinitialisation. Au rythme actuel, la projection est de 106 % : la limite arrive avant la réinitialisation de 14:52, et la semaine suit de près à 93 %.",
+        "Les deux limites sont en passe d'être épuisées. Cette fenêtre est projetée à 106 % : la limite arrive avant la réinitialisation de 14:52. La semaine, déjà à 93 %, est projetée à 114 % et sera épuisée avant samedi.",
       fiveHour:
         "Arrêtez les longues sessions maintenant. Requêtes courtes et ciblées jusqu'à la réinitialisation de 14:52 : sans ce ralentissement, la fin de la fenêtre sera entièrement bloquée.",
       weekly:
-        "La semaine a encore de la marge, mais moins d'une fenêtre de 5 heures pleine. C'est à peu près tout ce qu'il vous reste avant samedi : reportez ce qui peut attendre.",
+        "La semaine sera elle aussi épuisée avant samedi : 93 % utilisés, 114 % en projection. Ralentir aujourd'hui ne suffira pas : répartissez ce qui reste sur les prochains jours et reportez à la semaine prochaine ce qui peut attendre.",
     },
   },
   de: {
@@ -355,22 +388,22 @@ const ADVICE = {
         'Sie liegen etwas unter dem, was dieses Fenster zu diesem Zeitpunkt üblicherweise erreicht. In diesem Tempo landen Sie bei rund 46% — reichlich Luft.',
       fiveHour:
         'Hier gibt es nichts zu steuern. Selbst eine intensive letzte Stunde bleibt deutlich unter dem Limit, arbeiten Sie also wie geplant weiter.',
-      weekly: 'Die Woche ist kaum angetastet. Vor Samstag braucht das hier keine Aufmerksamkeit.',
+      weekly: 'Auch die Woche liegt unter ihrer Tempolinie. So weiter, und sie schließt am Samstag bei rund 72% — hier gibt es nichts zu beachten.',
     },
     caution: {
       summary:
         'Sie liegen etwa 12% über dem, was dieses Fenster zu diesem Zeitpunkt üblicherweise erreicht. Bei diesem Tempo landen Sie bei knapp 86% — unter dem Limit, aber ohne viel Reserve.',
       fiveHour:
         'Etwa 38 weitere Minuten in dieser Intensität sind unbedenklich. Danach entweder langsamer werden oder auf den Reset um 14:52 warten.',
-      weekly: 'Die Woche liegt im Plan. Zwei weitere Sitzungen wie diese wären der Punkt, ab dem Sie hinschauen sollten.',
+      weekly: 'Auch die Woche liegt über ihrer Tempolinie und steuert auf etwa 91% am Samstag zu. Noch innerhalb des Limits, aber zwei weitere intensive Tage würden den Rest aufbrauchen.',
     },
     danger: {
       summary:
-        'Dieses Fenster ist vor dem Reset aufgebraucht. Im aktuellen Tempo liegt die Prognose bei 106%, das Limit kommt also vor dem Reset um 14:52 — und die Woche steht mit 93% direkt dahinter.',
+        'Beide Limits laufen auf Erschöpfung zu. Die Prognose für dieses Fenster liegt bei 106%, das Limit kommt also vor dem Reset um 14:52 — und die Woche, schon bei 93%, steuert auf 114% zu und ist vor Samstag aufgebraucht.',
       fiveHour:
         'Hören Sie jetzt mit langen Sitzungen auf. Bis zum Reset um 14:52 nur kurze, gezielte Anfragen — ohne diese Drosselung ist die letzte Strecke komplett gesperrt.',
       weekly:
-        'Die Woche hat noch Luft, aber weniger als eine volle 5-Stunden-Periode. Viel mehr bleibt Ihnen bis Samstag nicht, halten Sie also alles zurück, was warten kann.',
+        'Auch die Woche ist vor Samstag aufgebraucht: 93% verbraucht, Prognose 114%. Nur heute langsamer zu machen reicht nicht — verteilen Sie den Rest auf die nächsten Tage und schieben Sie alles, was warten kann, in die nächste Woche.',
     },
   },
   pt: {
@@ -379,22 +412,22 @@ const ADVICE = {
         'Você está um pouco abaixo de onde esta janela normalmente está a esta altura. Nesse ritmo você termina perto de 46% — sobra bastante folga.',
       fiveHour:
         'Não há nada para gerenciar aqui. Mesmo uma última hora intensa termina bem abaixo do limite, então trabalhe como pretendia.',
-      weekly: 'A semana está quase intacta. Nada aqui exige atenção antes de sábado.',
+      weekly: 'A semana também está abaixo da linha de ritmo. Seguindo assim, ela fecha perto de 72% no sábado — nada para acompanhar.',
     },
     caution: {
       summary:
         'Você está cerca de 12% à frente de onde esta janela normalmente está a esta altura. Mantendo o ritmo atual, você termina perto de 86% — abaixo do limite, mas sem muita folga.',
       fiveHour:
         'Mais uns 38 minutos nessa intensidade são tranquilos. Depois disso, reduza o ritmo ou espere a reinicialização às 14:52.',
-      weekly: 'A semana está no caminho certo. Duas sessões como esta e já seria hora de começar a acompanhar.',
+      weekly: 'A semana também está à frente da linha de ritmo e caminha para cerca de 91% no sábado. Ainda dentro do limite, mas mais dois dias pesados consumiriam o resto.',
     },
     danger: {
       summary:
-        'Esta janela se esgota antes de reiniciar. No ritmo atual a projeção é de 106%, então o limite chega antes da reinicialização das 14:52 — e a semana vem logo atrás, em 93%.',
+        'Os dois limites estão a caminho de se esgotar. Esta janela projeta 106%, então o limite chega antes da reinicialização das 14:52 — e a semana, já em 93%, projeta 114% e se esgota antes de sábado.',
       fiveHour:
         'Pare de adicionar sessões longas agora. Só pedidos curtos e objetivos até a reinicialização das 14:52: sem essa redução, o trecho final fica totalmente bloqueado.',
       weekly:
-        'A semana ainda tem folga, mas menos de uma janela de 5 horas cheia. É quase tudo o que resta até sábado, então deixe para lá o que puder esperar.',
+        'A semana também se esgota antes de sábado: 93% usados, projeção de 114%. Reduzir o ritmo só hoje não resolve — distribua o que resta pelos próximos dias e deixe para a semana que vem o que puder esperar.',
     },
   },
   ja: {
@@ -403,43 +436,43 @@ const ADVICE = {
         '今は、この区間のいつもの流れより少し余裕のあるペースです。このままなら46%前後で終わり、余裕はたっぷり残ります。',
       fiveHour:
         'ここで管理することは特にありません。最後の1時間に作業が集中しても上限には届かないので、予定どおり進めて大丈夫です。',
-      weekly: '今週はまだほとんど使っていません。土曜日のリセットまで気にすることはありません。',
+      weekly: '週もペースの目安線より控えめです。このままなら土曜日に72%前後で終わるので、気にすることはありません。',
     },
     caution: {
       summary:
         '今は、この区間のいつもの流れより12%ほど先行しています。このペースを保つと86%前後で終わり、上限内ではありますが余裕は多くありません。',
       fiveHour:
         'この強度なら、あと38分ほどが無理のない範囲です。そのあとはペースを落とすか、14:52のリセットを待つのがよさそうです。',
-      weekly: '週の使用量は想定どおりです。今回のような作業をあと2回続けたら、そこから注意して見るタイミングです。',
+      weekly: '週もペースの目安線より先行していて、土曜日には91%前後になる見込みです。まだ上限内ですが、重い日があと2日あれば残りを使い切ります。',
     },
     danger: {
       summary:
-        'この区間はリセット前に上限へ達します。今のペースだと予測される期間終了時の使用率は106%で、14:52のリセットより先に上限へ届きます。週間上限も93%とすぐ後ろに迫っています。',
+        '両方の上限が尽きる流れです。この区間の予測は106%で、14:52のリセットより先に上限へ届きます。すでに93%の週間上限も予測は114%で、土曜日より前に尽きます。',
       fiveHour:
         '長い作業を足すのは今やめたほうがよいです。14:52のリセットまでは短く目的の絞れた依頼だけにしないと、最後の区間は完全に止まります。',
       weekly:
-        '週にはまだ余裕がありますが、5時間枠1回分にも届きません。土曜日まで使えるのは実質それだけなので、待てる作業は後回しにしてください。',
+        '週間上限も土曜日より前に尽きます。現在93%で、予測は114%です。今日だけペースを落としても解決しないので、残りの作業を数日に分け、待てるものは来週に回してください。',
     },
   },
   zh: {
     calm: {
       summary: '你目前比这个周期的通常进度略慢一些。按这个节奏会在 46% 左右结束，余量很充足。',
       fiveHour: '这里没什么需要管理的。即使最后一小时密集使用，也远低于额度上限，按原计划工作即可。',
-      weekly: '本周几乎还没用。周六重置之前无需关注。',
+      weekly: '本周也低于进度基准线。照这样下去，周六会在 72% 左右结束，无需关注。',
     },
     caution: {
       summary:
         '你目前比这个周期的通常进度快了约 12%。保持当前节奏会在 86% 左右结束，仍在额度内，但余量不多。',
       fiveHour: '按这个强度，再用 38 分钟左右比较稳妥。之后建议放慢节奏，或等 14:52 的重置。',
-      weekly: '本周进度正常。再来两次这样的会话，就该开始留意了。',
+      weekly: '本周也快于进度基准线，预计周六达到 91% 左右。仍在额度内，但再有两天高强度使用就会用完剩余额度。',
     },
     danger: {
       summary:
-        '这个周期会在重置前用尽。按当前节奏预计将达到 106%，也就是在 14:52 重置之前就触及上限；周额度也紧随其后，已达 93%。',
+        '两个额度都将用尽。这个周期预计达到 106%，会在 14:52 重置之前触及上限；本周额度已达 93%，预计达到 114%，会在周六之前用尽。',
       fiveHour:
         '现在就别再安排长时间会话了。在 14:52 重置前只用简短、目标明确的提问，否则最后一段会被完全卡住。',
       weekly:
-        '本周还有余量，但不足一个完整的 5 小时周期。到周六之前基本就只有这些，能等的先放一放。',
+        '本周额度也会在周六前用尽：已用 93%，预计 114%。只在今天放慢节奏解决不了问题，请把剩余工作分摊到接下来几天，能等的留到下周。',
     },
   },
   ru: {
@@ -448,22 +481,22 @@ const ADVICE = {
         'Сейчас вы идёте чуть медленнее, чем это окно обычно к этому времени. При таком темпе вы закончите около 46% — запас большой.',
       fiveHour:
         'Здесь нечем управлять. Даже насыщенный последний час завершится заметно ниже лимита, так что работайте как планировали.',
-      weekly: 'Неделя почти не тронута. До субботы здесь не о чем беспокоиться.',
+      weekly: 'Неделя тоже идёт ниже линии темпа. Если так продолжать, к субботе она закроется около 72% — следить не за чем.',
     },
     caution: {
       summary:
         'Сейчас вы примерно на 12% опережаете обычный ход этого окна. Если сохранить темп, вы закончите около 86% — в пределах лимита, но без большого запаса.',
       fiveHour:
         'Ещё примерно 38 минут в таком темпе — нормально. После этого либо сбавьте, либо дождитесь сброса в 14:52.',
-      weekly: 'Неделя идёт по плану. Ещё два таких сеанса — и пора будет следить.',
+      weekly: 'Неделя тоже опережает линию темпа и к субботе выйдет примерно на 91%. Пока в пределах лимита, но ещё пара насыщенных дней израсходует остаток.',
     },
     danger: {
       summary:
-        'Это окно закончится раньше, чем сбросится. При текущем темпе прогноз — 106%, то есть лимит наступит до сброса в 14:52, а неделя идёт следом с 93%.',
+        'Оба лимита идут к исчерпанию. Прогноз для этого окна — 106%, так что лимит наступит до сброса в 14:52, а неделя, уже на 93%, идёт к 114% и закончится до субботы.',
       fiveHour:
         'Прекратите добавлять длинные сеансы. До сброса в 14:52 только короткие точные запросы: без такого замедления последний отрезок будет полностью заблокирован.',
       weekly:
-        'На неделе ещё есть запас, но меньше одного полного 5-часового окна. До субботы это практически всё, что у вас есть, — отложите всё, что может подождать.',
+        'Неделя тоже закончится до субботы: израсходовано 93%, прогноз — 114%. Одного сегодняшнего замедления не хватит: распределите оставшееся на ближайшие дни и перенесите на следующую неделю всё, что может подождать.',
     },
   },
   it: {
@@ -472,22 +505,22 @@ const ADVICE = {
         "Sei un po' sotto il punto in cui questa finestra si trova di solito a quest'ora. Con questo ritmo chiudi intorno al 46%: margine in abbondanza.",
       fiveHour:
         "Non c'è nulla da gestire. Anche un'ultima ora intensa resta ben sotto il limite, quindi lavora come avevi previsto.",
-      weekly: "Come consumo, la settimana è appena cominciata. Niente che richieda attenzione prima di sabato.",
+      weekly: "Anche la settimana è sotto la sua linea di ritmo. Continuando così chiude intorno al 72% sabato: niente da tenere d'occhio.",
     },
     caution: {
       summary:
         "Sei circa il 12% avanti rispetto al punto in cui questa finestra si trova di solito a quest'ora. Mantenendo il ritmo chiudi vicino all'86%: sotto il limite, ma con poco margine.",
       fiveHour:
         "Altri 38 minuti circa a questa intensità sono tranquilli. Dopo, rallenta o aspetta il reset alle 14:52.",
-      weekly: "La settimana è in linea. Altre due sessioni come questa e sarebbe il momento di tenerla d'occhio.",
+      weekly: "Anche la settimana è avanti rispetto alla sua linea di ritmo e punta a circa il 91% per sabato. Ancora dentro il limite, ma altri due giorni intensi consumerebbero il resto.",
     },
     danger: {
       summary:
-        "Questa finestra si esaurisce prima del reset. Con il ritmo attuale la proiezione è del 106%, quindi il limite arriva prima del reset delle 14:52, e la settimana segue da vicino al 93%.",
+        "Entrambi i limiti stanno per esaurirsi. Questa finestra è proiettata al 106%, quindi il limite arriva prima del reset delle 14:52, e la settimana, già al 93%, è proiettata al 114% e si esaurisce prima di sabato.",
       fiveHour:
         "Smetti ora di aggiungere sessioni lunghe. Solo richieste brevi e mirate fino al reset delle 14:52: senza quel rallentamento l'ultimo tratto è del tutto bloccato.",
       weekly:
-        "Alla settimana resta margine, ma meno di una finestra da 5 ore piena. È quasi tutto quello che hai fino a sabato, quindi rimanda ciò che può attendere.",
+        "Anche la settimana si esaurisce prima di sabato: 93% usato, proiezione al 114%. Rallentare solo oggi non basta: distribuisci il lavoro rimasto sui prossimi giorni e rimanda alla settimana prossima ciò che può attendere.",
     },
   },
   nl: {
@@ -496,22 +529,22 @@ const ADVICE = {
         'Je zit iets onder waar dit venster op dit moment normaal staat. In dit tempo eindig je rond 46% — ruim marge over.',
       fiveHour:
         'Hier valt niets te managen. Zelfs een druk laatste uur blijft flink onder de limiet, dus werk zoals je van plan was.',
-      weekly: 'De week is nauwelijks aangeroerd. Hier hoeft niets voor zaterdag aandacht te krijgen.',
+      weekly: 'Ook de week zit onder de tempolijn. Ga zo door en hij sluit zaterdag rond 72% — niets om op te letten.',
     },
     caution: {
       summary:
         'Je zit ongeveer 12% boven waar dit venster op dit moment normaal staat. Houd je dit tempo aan, dan eindig je rond 86% — onder de limiet, maar zonder veel marge.',
       fiveHour:
         "Nog zo'n 38 minuten op deze intensiteit is comfortabel. Daarna rustiger aan doen of wachten op de reset van 14:52.",
-      weekly: 'De week loopt op schema. Nog twee sessies als deze en het is tijd om erop te letten.',
+      weekly: 'Ook de week zit boven de tempolijn en koerst af op ongeveer 91% op zaterdag. Nog binnen de limiet, maar nog twee drukke dagen en de rest is op.',
     },
     danger: {
       summary:
-        'Dit venster raakt op vóór de reset. In het huidige tempo komt de prognose op 106%, dus de limiet valt vóór de reset van 14:52 — en de week zit er met 93% kort achter.',
+        'Beide limieten raken op. Dit venster komt op een prognose van 106%, dus de limiet valt vóór de reset van 14:52 — en de week, al op 93%, koerst af op 114% en is vóór zaterdag op.',
       fiveHour:
         'Stop nu met lange sessies. Tot de reset van 14:52 alleen korte, gerichte vragen: zonder die vertraging is het laatste stuk helemaal geblokkeerd.',
       weekly:
-        'De week heeft nog ruimte, maar minder dan één volle periode van 5 uur. Veel meer heb je tot zaterdag niet, dus stel uit wat kan wachten.',
+        'Ook de week is vóór zaterdag op: 93% gebruikt, prognose 114%. Alleen vandaag rustiger aan doen is niet genoeg — verdeel wat overblijft over de komende dagen en schuif door naar volgende week wat kan wachten.',
     },
   },
   pl: {
@@ -520,22 +553,22 @@ const ADVICE = {
         'Jesteś trochę poniżej tego, gdzie to okno zwykle jest o tej porze. W tym tempie skończysz około 46% — zapasu jest dużo.',
       fiveHour:
         'Nie ma tu czym zarządzać. Nawet intensywna ostatnia godzina zmieści się wyraźnie pod limitem, więc pracuj tak, jak masz w planie.',
-      weekly: 'Tydzień jest prawie nietknięty. Do soboty nic tu nie wymaga uwagi.',
+      weekly: 'Tydzień też jest poniżej linii tempa. Jeśli tak zostanie, w sobotę zamknie się około 72% — nie ma czego pilnować.',
     },
     caution: {
       summary:
         'Jesteś około 12% powyżej tego, gdzie to okno zwykle jest o tej porze. Przy tym tempie skończysz blisko 86% — pod limitem, ale bez dużego zapasu.',
       fiveHour:
         'Jeszcze około 38 minut w tej intensywności jest bezpieczne. Potem albo zwolnij, albo poczekaj na reset o 14:52.',
-      weekly: 'Tydzień idzie zgodnie z planem. Jeszcze dwie takie sesje i trzeba będzie zacząć pilnować.',
+      weekly: 'Tydzień też wyprzedza linię tempa i zmierza do około 91% w sobotę. Wciąż w limicie, ale jeszcze dwa intensywne dni zużyją resztę.',
     },
     danger: {
       summary:
-        'To okno wyczerpie się przed resetem. W obecnym tempie prognoza to 106%, więc limit skończy się przed resetem o 14:52, a tydzień jest tuż za nim, na 93%.',
+        'Oba limity zmierzają do wyczerpania. Prognoza dla tego okna to 106%, więc limit skończy się przed resetem o 14:52, a tydzień, już na 93%, zmierza do 114% i skończy się przed sobotą.',
       fiveHour:
         'Przestań teraz dodawać długie sesje. Do resetu o 14:52 tylko krótkie, konkretne zapytania — bez takiego zwolnienia ostatni odcinek będzie całkowicie zablokowany.',
       weekly:
-        'W tygodniu został jeszcze zapas, ale mniej niż jedno pełne 5-godzinne okno. Do soboty to praktycznie wszystko, co masz, więc odłóż to, co może poczekać.',
+        'Tydzień też skończy się przed sobotą: zużyte 93%, prognoza 114%. Samo zwolnienie dzisiaj nie wystarczy — rozłóż resztę pracy na najbliższe dni, a to, co może poczekać, przenieś na przyszły tydzień.',
     },
   },
 }

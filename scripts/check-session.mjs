@@ -36,11 +36,12 @@ for (const workload of S.WORKLOADS) {
   )
 }
 
-// The weekly endpoints are quoted the same way. Their starts are worked backwards
-// from them at a fixed rate, so this is the only weekly figure to pin.
+// Where the weekly bar stops is quoted the same way. Its start is worked backwards
+// from it at a fixed rate, so this is the only weekly reading to pin. (The weekly
+// *projection* runs to Saturday's reset, days after the session, so it is not.)
 for (const workload of S.WORKLOADS) {
   const end = S.SESSIONS[workload].weeklyEnd
-  const quoted = PROJECTED[workload].weekly
+  const quoted = PROJECTED[workload].weeklyNow
   if (end !== quoted) {
     bad++
     console.log(`${workload}: weekly ends at ${end} but the advice quotes ${quoted}`)
@@ -81,6 +82,95 @@ for (const workload of S.WORKLOADS) {
       }
     })
   })
+}
+
+// Each workload is meant to hold one state on both limits for as long as it plays
+// (ARRIVAL / SCENE_END in simulate.js). The pace line moves with the clock and the
+// readings move with the script, which run at different rates — the clock at the
+// visitor's chosen speed, the script always in real time — so whether a state
+// holds depends on the speed. This replays each workload the way Demo.jsx and
+// useSession.js step it, at every speed, in both site languages (a longer prompt
+// takes longer to type, which delays the readings), and flags the first tick
+// where either light shows something other than the workload's own state.
+const SIM = await import(pathToFileURL(resolve(ROOT, 'src/demo/simulate.js')).href)
+const siteTrees = []
+for (const f of ['en.js', 'ko.js']) {
+  const mod = await import(pathToFileURL(resolve(ROOT, 'src/i18n', f)).href)
+  siteTrees.push([f, Object.values(mod).find((v) => v?.demo?.prompts)])
+}
+
+// Mirrors of the constants the replay depends on. If either file changes these,
+// change them here too.
+const SESSION_TICK = 50 // useSession TICK_MS
+const TYPE_MS = 45
+const THINK_MS = 900
+const BETWEEN_TURNS_MS = 8000
+const clockTick = (speed) => Math.max(200, Math.round(1000 / speed)) // Demo.jsx
+
+function replay(workload, speed, prompts) {
+  const turns = S.SESSIONS[workload].turns
+  const s = { played: 0, turn: null, nextTurn: 0, typeAt: 0, pending: '', lineAt: 0, wait: 0 }
+  const expected = S.SESSIONS[workload].risk
+  const tick = clockTick(speed)
+  let elapsed = SIM.arrivalAt(workload)
+  const end = SIM.sceneEndAt(workload)
+
+  for (let now = 0; ; now += SESSION_TICK) {
+    // The clock, on its own interval.
+    if (now > 0 && now % tick === 0) {
+      if (elapsed + tick * speed >= end) return null
+      elapsed += tick * speed
+    }
+
+    const spent = { window: s.played, week: s.played }
+    const u = SIM.usageAt(workload, spent, elapsed)
+    if (u.fiveHourRisk !== expected || u.weeklyRisk !== expected) {
+      const at = Math.round((elapsed / SIM.FIVE_HOUR_MS) * 1000) / 10
+      return `${(now / 1000).toFixed(1)}s in, ${at}% into the window: 5h ${u.fiveHourPct}% -> ${u.fiveHourRisk}, week ${u.weeklyPct}% -> ${u.weeklyRisk}`
+    }
+    if (SIM.blockedBy(workload, spent)) continue
+
+    // One session tick, as useSession steps it.
+    if (s.wait > 0) {
+      s.wait -= SESSION_TICK
+      if (s.wait > 0) continue
+    }
+    if (!s.turn) {
+      if (s.nextTurn >= turns.length) continue
+      s.turn = turns[s.nextTurn++]
+      s.pending = prompts[s.turn.prompt]
+      s.typeAt = 0
+      s.lineAt = 0
+    }
+    if (s.typeAt < s.pending.length) {
+      s.typeAt = Math.min(s.pending.length, s.typeAt + Math.max(1, Math.round(SESSION_TICK / TYPE_MS)))
+      if (s.typeAt >= s.pending.length) s.wait = THINK_MS
+      continue
+    }
+    const line = s.turn.lines[s.lineAt]
+    if (line) {
+      s.played = Math.round((s.played + line[2]) * 10) / 10
+      s.lineAt += 1
+      s.wait = line[3]
+      continue
+    }
+    s.turn = null
+    s.wait = BETWEEN_TURNS_MS
+  }
+}
+
+console.log('')
+for (const workload of S.WORKLOADS) {
+  for (const speed of [1, 60, 300]) {
+    for (const [file, tree] of siteTrees) {
+      const broke = replay(workload, speed, tree.demo.prompts)
+      if (broke) {
+        bad++
+        console.log(`${workload.padEnd(8)} ${String(speed).padStart(3)}x ${file}: leaves "${S.SESSIONS[workload].risk}" ${broke}`)
+      }
+    }
+  }
+  console.log(`${workload.padEnd(8)} holds "${S.SESSIONS[workload].risk}" on both limits at 1x, 60x and 300x`)
 }
 
 console.log(bad ? `\n${bad} mismatch(es)` : '\nTotals agree with the advice in all twelve languages, and every hold keeps time.')

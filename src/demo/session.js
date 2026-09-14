@@ -11,7 +11,7 @@
 // in advance; the costs are plausible numbers, not measured ones.
 //
 // One hard constraint: each workload's total must stay at the figure the pace
-// advice quotes (46 / 86 / 106, weekly 34 / 61 / 93), because that advice is
+// advice quotes (46 / 86 / 106, weekly bar 34 / 61 / 93), because that advice is
 // written out in twelve languages and none of it should have to change when this
 // script does. `node scripts/check-session.mjs` says so out loud if a total
 // drifts.

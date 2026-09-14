@@ -550,6 +550,51 @@ button.db-close:hover {
   color: var(--ok);
 }
 
+/* A workload's button carries the state it holds on both limits, in the widget's
+   own three colours, so the choice says what it will show before it is made. */
+.dctl-seg button[data-risk] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.dctl-seg button[data-risk]::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--risk);
+  opacity: 0.55;
+}
+
+.dctl-seg button[data-risk].on::before {
+  opacity: 1;
+}
+
+.dctl-seg button[data-risk='safe'] {
+  --risk: var(--ok);
+}
+
+.dctl-seg button[data-risk='caution'] {
+  --risk: var(--caution);
+}
+
+.dctl-seg button[data-risk='danger'] {
+  --risk: var(--redline);
+}
+
+.dctl-seg button[data-risk].on {
+  color: var(--risk);
+  background: color-mix(in srgb, var(--risk) 14%, transparent);
+}
+
+.dctl-workload-note {
+  flex-basis: 100%;
+  margin: -4px 0 0;
+  font-size: var(--t-sm);
+  color: var(--paper-dim);
+}
+
 .dctl-play {
   min-width: 92px;
   padding: 7px 14px;

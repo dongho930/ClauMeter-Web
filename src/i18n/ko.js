@@ -116,6 +116,11 @@ export default {
 
     workloadLabel: '작업량',
     workloads: { calm: '가벼운 작업', caution: '모듈 리팩터링', danger: '전역 리네이밍' },
+    workloadNotes: {
+      calm: '5시간·주간 모두 안전 — 기준선보다 느리고 한도에 한참 못 미쳐요. 알림도 뜨지 않아요.',
+      caution: '5시간·주간 모두 주의 — 기준선보다 빠르지만 한도 안에서 마감돼요. 75%에서 알림이 떠요.',
+      danger: '5시간·주간 모두 위험 — 둘 다 초기화 전에 바닥나는 속도예요. 90% 알림 뒤 5시간 한도에 막혀요.',
+    },
     osLabel: '운영체제',
     os: { win: 'Windows', mac: 'macOS' },
     speedLabel: '시계',
