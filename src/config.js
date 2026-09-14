@@ -5,7 +5,7 @@ const REPO = 'https://github.com/dongho930/ClauMeter'
 // API never does (rate limit, offline, blocked). The live numbers come from
 // useRelease() — see release.jsx. Keep this pointing at a release that really
 // exists, because a broken download is worse than an old one.
-export const VERSION = 'v1.8.1'
+export const VERSION = 'v1.8.2'
 
 // GitHub rewrites the spaces in an uploaded asset's name as dots, so the file
 // that actually lands in the user's Downloads folder is "ClauMeter.Setup.1.1.0.exe",
@@ -18,8 +18,8 @@ export const MAC_INSTALLER = `ClauMeter-${VERSION.slice(1)}-universal.dmg`
 
 // The installer is not code-signed, so the page publishes its hash instead and
 // tells people how to check it. Verified against the released asset's own digest.
-// Re-take after each build with: Get-FileHash "dist/ClauMeter Setup 1.8.1.exe" -Algorithm SHA256
-export const SHA256 = '962439e225afee86d021e890ce3b97f72fa18fca4e49510e673b402b4821b54e'
+// Re-take after each build with: Get-FileHash "dist/ClauMeter Setup 1.8.2.exe" -Algorithm SHA256
+export const SHA256 = '698c6964a525a408f80659a5366aae1d87c11d66b4a042aecdf98646882b9bb3'
 
 // The releases API GitHub is asked for the current version and its assets.
 export const RELEASE_API = 'https://api.github.com/repos/dongho930/ClauMeter/releases/latest'
